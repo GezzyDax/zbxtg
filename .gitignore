@@ -3,6 +3,9 @@
 .env.local
 *.env
 
+# Claude Code настройки
+.claude/
+
 # Логи
 logs/
 *.log
