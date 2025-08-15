@@ -1,0 +1,49 @@
+services:
+  zbxtg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zabbix-telegram-bot
+    restart: unless-stopped
+    environment:
+      # Настройки Zabbix
+      - ZABBIX_URL=${ZABBIX_URL}
+      - ZABBIX_API_TOKEN=${ZABBIX_API_TOKEN}
+      - ZABBIX_USERNAME=${ZABBIX_USERNAME}
+      - ZABBIX_PASSWORD=${ZABBIX_PASSWORD}
+      - ZABBIX_SSL_VERIFY=${ZABBIX_SSL_VERIFY:-true}
+      
+      # Настройки Telegram
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_PARSE_MODE=HTML
+      
+      # Дополнительные настройки
+      - POLL_INTERVAL=${POLL_INTERVAL:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_DELAY=${RETRY_DELAY:-5}
+    volumes:
+      # Монтируем логи для просмотра
+      - ./logs:/app/logs
+    networks:
+      - zbxtg-network
+    # Ограничения ресурсов
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    # Логирование
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  zbxtg-network:
+    driver: bridge
