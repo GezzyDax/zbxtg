@@ -24,6 +24,9 @@ COPY ssl-certs/ /usr/local/share/ca-certificates/
 # Обновляем trust store
 RUN update-ca-certificates
 
+# Создаем директорию для логов с правильными правами
+RUN mkdir -p /app/logs && chown zbxtg:zbxtg /app/logs
+
 # Копируем исходный код
 COPY --chown=zbxtg:zbxtg *.py ./
 

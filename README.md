@@ -292,6 +292,67 @@ sudo systemctl start zbxtg
 docker-compose up -d --restart unless-stopped
 ```
 
+## 🔄 Обновление
+
+### Автоматическое обновление
+
+Для обновления до последней версии используйте скрипты обновления:
+
+#### Linux:
+```bash
+# Автоматическое обновление с GitHub
+./update.sh
+
+# Принудительное обновление (без подтверждения)
+./update.sh --force
+```
+
+#### Windows (PowerShell):
+```powershell
+# Автоматическое обновление
+.\update.ps1
+
+# Принудительное обновление
+.\update.ps1 -Force
+```
+
+#### Windows (Batch):
+```cmd
+# Автоматическое обновление
+update.bat
+```
+
+### Что делает скрипт обновления:
+
+1. ✅ **Проверяет наличие обновлений** с GitHub
+2. 💾 **Сохраняет конфигурацию** (.env файл)
+3. 🔒 **Сохраняет SSL сертификаты** (папка ssl-certs/)
+4. ⏹️ **Останавливает текущий бот**
+5. ⬇️ **Загружает обновления** с GitHub
+6. 🔧 **Восстанавливает настройки**
+7. 🔨 **Пересобирает Docker образ** (при необходимости)
+8. ▶️ **Запускает обновленный бот**
+
+### Ручное обновление
+
+```bash
+# Сохраните конфигурацию
+cp .env .env.backup
+
+# Остановите бота
+./docker-run.sh stop
+
+# Обновите код
+git pull origin master
+
+# Восстановите конфигурацию
+cp .env.backup .env
+
+# Пересоберите и запустите
+./docker-run.sh build
+./docker-run.sh start
+```
+
 ## 🔧 Troubleshooting
 
 ### Проблемы с Zabbix
@@ -335,6 +396,12 @@ zbxtg/
 ├── 🐳 Dockerfile          # Образ Docker
 ├── 🐳 docker-compose.yml  # Оркестрация Docker
 ├── 📋 requirements.txt    # Python зависимости
+├── 🔄 update.sh           # Скрипт обновления (Linux)
+├── 🔄 update.ps1          # Скрипт обновления (Windows PowerShell)
+├── 🔄 update.bat          # Скрипт обновления (Windows Batch)
+├── 🚀 docker-run.sh       # Управление Docker (Linux)
+├── 🚀 docker-run.ps1      # Управление Docker (Windows PowerShell)
+├── 🚀 docker-run.bat      # Управление Docker (Windows Batch)
 ├── 📁 ssl-certs/          # SSL сертификаты
 ├── 📁 logs/               # Файлы логов
 └── 📜 .env                # Конфигурация (не в git)
