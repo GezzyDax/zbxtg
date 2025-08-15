@@ -3,9 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
     container_name: zabbix-telegram-bot
     restart: unless-stopped
     environment:

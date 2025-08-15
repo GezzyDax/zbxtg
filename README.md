@@ -367,7 +367,7 @@ cp .env.backup .env
 
 | Проблема | Решение |
 |----------|---------|
-| Permission denied: '/app/logs/zbxtg.log' | Установите правильные `USER_ID` и `GROUP_ID` в `.env` (обычно 1000) |
+| Permission denied: '/app/logs/zbxtg.log' | Пересоберите образ: `./docker-run.sh build` (исправлено в новой версии) |
 | Permission denied: docker.sock | Добавьте пользователя в группу docker: `sudo usermod -aG docker $USER` |
 | Container keeps restarting | Проверьте конфигурацию в `.env` и логи: `./docker-run.sh logs` |
 

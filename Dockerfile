@@ -6,12 +6,6 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Создаем пользователя для безопасности с тем же UID что и хост
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-RUN groupadd -g ${GROUP_ID} zbxtg && \
-    useradd -u ${USER_ID} -g ${GROUP_ID} --create-home --shell /bin/bash zbxtg
-
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
@@ -27,14 +21,18 @@ COPY ssl-certs/ /usr/local/share/ca-certificates/
 # Обновляем trust store
 RUN update-ca-certificates
 
-# Создаем директорию для логов с правильными правами
-RUN mkdir -p /app/logs && chown zbxtg:zbxtg /app/logs
+# Создаем директорию для логов
+RUN mkdir -p /app/logs
 
 # Копируем исходный код
-COPY --chown=zbxtg:zbxtg *.py ./
+COPY *.py ./
 
-# Переключаемся на пользователя
-USER zbxtg
+# Создаем скрипт для установки прав при запуске
+RUN echo '#!/bin/bash\nchmod 777 /app/logs 2>/dev/null || true\nexec "$@"' > /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+# Используем entrypoint для установки прав
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Переменные окружения по умолчанию
 ENV PYTHONUNBUFFERED=1

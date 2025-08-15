@@ -8,9 +8,7 @@ param(
 Write-Host "🐳 Zabbix Telegram Bot - Docker запуск" -ForegroundColor Cyan
 Write-Host ""
 
-# В Windows Docker работает с host-пользователем
-$env:USER_ID = "1000"
-$env:GROUP_ID = "1000"
+# В Windows Docker работает с правами администратора
 
 # Создаем директорию для логов
 if (-not (Test-Path "logs")) {
