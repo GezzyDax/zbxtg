@@ -4,7 +4,10 @@ setlocal EnableDelayedExpansion
 
 REM Batch скрипт для запуска Zabbix Telegram Bot в Docker на Windows
 
-echo 🐳 Zabbix Telegram Bot - Docker запуск
+echo.
+echo ==========================================
+echo    Zabbix Telegram Bot - Docker
+echo ==========================================
 echo.
 
 REM Создаем директорию для логов
@@ -13,7 +16,7 @@ if not exist "logs" mkdir logs
 REM Проверяем наличие Docker
 where docker >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ Docker не найден. Пожалуйста, установите Docker Desktop for Windows
+    echo [ОШИБКА] Docker не найден. Установите Docker Desktop for Windows
     pause
     exit /b 1
 )
@@ -31,7 +34,7 @@ if %errorlevel% equ 0 (
 )
 
 if "%COMPOSE_CMD%"=="" (
-    echo ❌ docker-compose или docker compose не найден
+    echo [ОШИБКА] docker-compose или docker compose не найден
     pause
     exit /b 1
 )
@@ -51,52 +54,52 @@ if /i "%ACTION%"=="clean" goto CLEAN
 goto HELP
 
 :BUILD
-echo 🔨 Собираем образ...
+echo [INFO] Собираем образ...
 %COMPOSE_CMD% build --no-cache
 goto END
 
 :START
-echo ▶️ Запускаем бот...
+echo [INFO] Запускаем бот...
 %COMPOSE_CMD% up -d
 echo.
-echo ✅ Бот запущен в фоновом режиме
-echo 📋 Просмотр логов: docker-run.bat logs
-echo ⏹️ Остановка: docker-run.bat stop
+echo [УСПЕХ] Бот запущен в фоновом режиме
+echo [INFO] Просмотр логов: docker-run.bat logs
+echo [INFO] Остановка: docker-run.bat stop
 goto END
 
 :STOP
-echo ⏹️ Останавливаем бот...
+echo [INFO] Останавливаем бот...
 %COMPOSE_CMD% down
-echo ✅ Бот остановлен
+echo [УСПЕХ] Бот остановлен
 goto END
 
 :RESTART
-echo 🔄 Перезапускаем бот...
+echo [INFO] Перезапускаем бот...
 %COMPOSE_CMD% down
 %COMPOSE_CMD% up -d
-echo ✅ Бот перезапущен
+echo [УСПЕХ] Бот перезапущен
 goto END
 
 :LOGS
-echo 📋 Просмотр логов (Ctrl+C для выхода):
+echo [INFO] Просмотр логов (Ctrl+C для выхода):
 %COMPOSE_CMD% logs -f zbxtg
 goto END
 
 :STATUS
-echo 📊 Статус контейнера:
+echo [INFO] Статус контейнера:
 %COMPOSE_CMD% ps
 goto END
 
 :SHELL
-echo 🐚 Вход в контейнер:
+echo [INFO] Вход в контейнер:
 %COMPOSE_CMD% exec zbxtg /bin/bash
 goto END
 
 :CLEAN
-echo 🧹 Очистка...
+echo [INFO] Очистка...
 %COMPOSE_CMD% down -v --remove-orphans
 docker image prune -f
-echo ✅ Очистка завершена
+echo [УСПЕХ] Очистка завершена
 goto END
 
 :HELP
