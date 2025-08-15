@@ -10,6 +10,10 @@ echo    Zabbix Telegram Bot - Docker
 echo ==========================================
 echo.
 
+REM В Windows Docker работает с host-пользователем
+set USER_ID=1000
+set GROUP_ID=1000
+
 REM Создаем директорию для логов
 if not exist "logs" mkdir logs
 

@@ -6,8 +6,13 @@ set -e
 echo "🐳 Zabbix Telegram Bot - Docker запуск"
 echo ""
 
-# Создаем директорию для логов
+# Экспортируем USER_ID и GROUP_ID для Docker
+export USER_ID=$(id -u)
+export GROUP_ID=$(id -g)
+
+# Создаем директорию для логов с правильными правами
 mkdir -p logs
+chmod 755 logs
 
 # Проверяем наличие docker-compose
 if ! command -v docker-compose &> /dev/null; then

@@ -6,8 +6,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Создаем пользователя для безопасности
-RUN useradd --create-home --shell /bin/bash zbxtg
+# Создаем пользователя для безопасности с тем же UID что и хост
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd -g ${GROUP_ID} zbxtg && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} --create-home --shell /bin/bash zbxtg
 
 # Устанавливаем рабочую директорию
 WORKDIR /app

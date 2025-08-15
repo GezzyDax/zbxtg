@@ -363,6 +363,14 @@ cp .env.backup .env
 | Authentication failed | Проверьте API токен или логин/пароль |
 | Connection refused | Проверьте URL и доступность Zabbix API |
 
+### Проблемы с Docker
+
+| Проблема | Решение |
+|----------|---------|
+| Permission denied: '/app/logs/zbxtg.log' | Установите правильные `USER_ID` и `GROUP_ID` в `.env` (обычно 1000) |
+| Permission denied: docker.sock | Добавьте пользователя в группу docker: `sudo usermod -aG docker $USER` |
+| Container keeps restarting | Проверьте конфигурацию в `.env` и логи: `./docker-run.sh logs` |
+
 ### Проблемы с Telegram
 
 | Проблема | Решение |
