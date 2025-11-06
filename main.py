@@ -64,7 +64,7 @@ class ZabbixTelegramBot:
         logging.getLogger('telegram').setLevel(logging.WARNING)
         logging.getLogger('urllib3').setLevel(logging.WARNING)
         
-        self.logger.info(f"Logging initialized with level: {self.config.log_level}")
+        self.logger.info(f"Логирование инициализировано с уровнем: {self.config.log_level}")
     
     async def initialize(self):
         """Инициализация всех компонентов"""
@@ -73,27 +73,27 @@ class ZabbixTelegramBot:
             self.config = get_config()
             self.setup_logging()
             
-            self.logger.info("Starting Zabbix Telegram Bot...")
+            self.logger.info("Запуск Zabbix Telegram бота...")
             self.logger.info(f"Zabbix URL: {self.config.zabbix.url}")
-            self.logger.info(f"Target Chat ID: {self.config.telegram.target_chat_id}")
-            self.logger.info(f"Poll interval: {self.config.poll_interval}s")
+            self.logger.info(f"ID целевого чата: {self.config.telegram.target_chat_id}")
+            self.logger.info(f"Интервал опроса: {self.config.poll_interval}с")
             
             # Инициализируем клиенты
             self.zabbix_client = ZabbixClient(self.config.zabbix)
             self.telegram_bot = TelegramBot(self.config.telegram)
             
             # Проверяем подключения
-            self.logger.info("Checking connections...")
-            
+            self.logger.info("Проверка подключений...")
+
             # Проверяем Zabbix
             if not self.zabbix_client.authenticate():
-                raise RuntimeError("Failed to authenticate to Zabbix")
-            self.logger.info("✓ Zabbix connection successful")
-            
+                raise RuntimeError("Не удалось аутентифицироваться в Zabbix")
+            self.logger.info("✓ Подключение к Zabbix успешно")
+
             # Проверяем Telegram
             if not await self.telegram_bot.check_connection():
-                raise RuntimeError("Failed to connect to Telegram")
-            self.logger.info("✓ Telegram connection successful")
+                raise RuntimeError("Не удалось подключиться к Telegram")
+            self.logger.info("✓ Подключение к Telegram успешно")
             
             # Инициализируем Telegram бота
             await self.telegram_bot.initialize()
@@ -111,40 +111,40 @@ class ZabbixTelegramBot:
             # Отправляем стартовое сообщение
             await self.send_startup_message()
             
-            self.logger.info("All components initialized successfully")
+            self.logger.info("Все компоненты успешно инициализированы")
             
         except Exception as e:
-            self.logger.error(f"Initialization failed: {e}")
+            self.logger.error(f"Инициализация не удалась: {e}")
             raise
     
     async def send_startup_message(self):
         """Отправляет сообщение о запуске бота"""
         try:
             message = """
-🚀 <b>Zabbix Monitor Started</b>
+🚀 <b>Zabbix монитор запущен</b>
 
-✅ Successfully connected to:
+✅ Успешно подключено к:
 - Zabbix API
 - Telegram Bot API
 
-🔔 I will now monitor for new alerts and send them to this chat.
+🔔 Теперь я буду отслеживать новые алерты и отправлять их в этот чат.
 
-Use /help to see available commands.
+Используйте /help чтобы увидеть доступные команды.
             """.strip()
             
             await self.telegram_bot.send_message(message)
             
         except Exception as e:
-            self.logger.error(f"Failed to send startup message: {e}")
+            self.logger.error(f"Не удалось отправить стартовое сообщение: {e}")
     
     async def send_shutdown_message(self):
         """Отправляет сообщение об остановке бота"""
         try:
-            message = "🛑 <b>Zabbix Monitor Stopped</b>\n\nMonitoring has been terminated."
+            message = "🛑 <b>Zabbix монитор остановлен</b>\n\nМониторинг был завершен."
             await self.telegram_bot.send_message(message)
             
         except Exception as e:
-            self.logger.error(f"Failed to send shutdown message: {e}")
+            self.logger.error(f"Не удалось отправить сообщение об остановке: {e}")
     
     async def run(self):
         """Запускает основной цикл приложения"""
@@ -161,7 +161,7 @@ Use /help to see available commands.
             loop = asyncio.get_event_loop()
 
             def signal_handler():
-                self.logger.info("Received shutdown signal")
+                self.logger.info("Получен сигнал завершения")
                 self.alert_monitor.stop_monitoring()
                 for task in tasks:
                     task.cancel()
@@ -170,29 +170,29 @@ Use /help to see available commands.
             for sig in [signal.SIGTERM, signal.SIGINT]:
                 loop.add_signal_handler(sig, signal_handler)
 
-            self.logger.info("Bot is running. Press Ctrl+C to stop.")
+            self.logger.info("Бот работает. Нажмите Ctrl+C для остановки.")
 
             # Ждем завершения всех задач
             try:
                 await asyncio.gather(*tasks)
             except asyncio.CancelledError:
-                self.logger.info("Tasks cancelled, shutting down...")
+                self.logger.info("Задачи отменены, завершение работы...")
             finally:
                 # Удаляем обработчики сигналов
                 for sig in [signal.SIGTERM, signal.SIGINT]:
                     loop.remove_signal_handler(sig)
 
         except KeyboardInterrupt:
-            self.logger.info("Received keyboard interrupt")
+            self.logger.info("Получено прерывание с клавиатуры")
         except Exception as e:
-            self.logger.error(f"Runtime error: {e}")
+            self.logger.error(f"Ошибка выполнения: {e}")
             raise
         finally:
             await self.shutdown()
     
     async def shutdown(self):
         """Корректно завершает работу всех компонентов"""
-        self.logger.info("Shutting down...")
+        self.logger.info("Завершение работы...")
         
         try:
             # Отправляем сообщение об остановке
@@ -208,9 +208,9 @@ Use /help to see available commands.
                 await self.telegram_bot.stop()
                 
         except Exception as e:
-            self.logger.error(f"Error during shutdown: {e}")
-        
-        self.logger.info("Shutdown complete")
+            self.logger.error(f"Ошибка при завершении: {e}")
+
+        self.logger.info("Завершение выполнено")
 
 
 async def main():
@@ -220,23 +220,23 @@ async def main():
     try:
         await bot.run()
     except KeyboardInterrupt:
-        print("\nShutdown requested...")
+        print("\nЗапрошено завершение...")
     except Exception as e:
-        print(f"Fatal error: {e}")
+        print(f"Критическая ошибка: {e}")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     # Проверяем версию Python
     if sys.version_info < (3, 8):
-        print("Error: Python 3.8 or higher is required")
+        print("Ошибка: Требуется Python 3.8 или выше")
         sys.exit(1)
     
     # Запускаем приложение
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nGoodbye!")
+        print("\nДо свидания!")
     except Exception as e:
-        print(f"Failed to start: {e}")
+        print(f"Не удалось запустить: {e}")
         sys.exit(1)
