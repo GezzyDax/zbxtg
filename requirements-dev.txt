@@ -16,7 +16,7 @@ pre-commit==4.3.0
 
 # Security
 bandit==1.8.6
-safety==3.6.2
+safety==3.7.0
 
 # Type stubs
 types-requests==2.32.4.20250913
