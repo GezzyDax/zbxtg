@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from typing import Optional, Dict, Any
-from telegram import Update, Bot
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application, 
-    CommandHandler, 
-    MessageHandler, 
+    Application,
+    CommandHandler,
+    MessageHandler,
     filters,
     ContextTypes
 )
@@ -84,8 +84,14 @@ class TelegramBot:
             except Exception as e:
                 logger.error(f"Error stopping Telegram bot: {e}")
     
-    async def send_message(self, message: str, parse_mode: str = None, retry_count: int = 3) -> bool:
-        """Отправляет сообщение целевому пользователю с retry механизмом"""
+    async def send_message(self, message: str, parse_mode: str = None,
+                          reply_markup: Optional[InlineKeyboardMarkup] = None,
+                          retry_count: int = 3) -> Optional[int]:
+        """Отправляет сообщение целевому пользователю с retry механизмом
+
+        Returns:
+            message_id если успешно, None если ошибка
+        """
         MAX_MESSAGE_LENGTH = 4096
 
         for attempt in range(retry_count):
@@ -112,26 +118,33 @@ class TelegramBot:
                         msg_copy = msg_copy[split_pos:].lstrip()
 
                     # Отправляем все части
+                    last_message_id = None
                     for i, part in enumerate(parts, 1):
                         header = f"📄 Часть {i}/{len(parts)}\n\n" if len(parts) > 1 else ""
-                        await self.bot.send_message(
+                        # Кнопки только на последней части
+                        part_markup = reply_markup if i == len(parts) else None
+                        sent_message = await self.bot.send_message(
                             chat_id=self.config.target_chat_id,
                             text=header + part,
                             parse_mode=parse_mode or self.config.parse_mode,
+                            reply_markup=part_markup,
                             disable_web_page_preview=True
                         )
-                        logger.debug(f"Message part {i}/{len(parts)} sent")
+                        last_message_id = sent_message.message_id
+                        logger.debug(f"Message part {i}/{len(parts)} sent (message_id: {last_message_id})")
+
+                    return last_message_id
 
                 else:
-                    await self.bot.send_message(
+                    sent_message = await self.bot.send_message(
                         chat_id=self.config.target_chat_id,
                         text=message,
                         parse_mode=parse_mode or self.config.parse_mode,
+                        reply_markup=reply_markup,
                         disable_web_page_preview=True
                     )
-                    logger.debug(f"Message sent to chat {self.config.target_chat_id}")
-
-                return True
+                    logger.debug(f"Message sent to chat {self.config.target_chat_id} (message_id: {sent_message.message_id})")
+                    return sent_message.message_id
 
             except TelegramError as e:
                 if attempt < retry_count - 1:
@@ -141,38 +154,121 @@ class TelegramBot:
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Failed to send message after {retry_count} attempts: {e}")
+                    return None
+
+        return None
+
+    async def edit_message(self, message_id: int, message: str, parse_mode: str = None,
+                          reply_markup: Optional[InlineKeyboardMarkup] = None, retry_count: int = 3) -> bool:
+        """Редактирует существующее сообщение"""
+        for attempt in range(retry_count):
+            try:
+                await self.bot.edit_message_text(
+                    chat_id=self.config.target_chat_id,
+                    message_id=message_id,
+                    text=message,
+                    parse_mode=parse_mode or self.config.parse_mode,
+                    reply_markup=reply_markup,
+                    disable_web_page_preview=True
+                )
+                logger.debug(f"Message {message_id} edited successfully")
+                return True
+
+            except TelegramError as e:
+                if "message is not modified" in str(e).lower():
+                    logger.debug(f"Message {message_id} content unchanged, skipping edit")
+                    return True
+
+                if attempt < retry_count - 1:
+                    wait_time = 2 ** attempt
+                    logger.warning(f"Failed to edit message (attempt {attempt + 1}/{retry_count}): {e}")
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to edit message after {retry_count} attempts: {e}")
                     return False
 
         return False
-    
-    async def send_alert(self, alert_data: Dict[str, Any]) -> bool:
-        """Отправляет форматированное уведомление об алерте"""
+
+    async def delete_message(self, message_id: int, retry_count: int = 3) -> bool:
+        """Удаляет сообщение"""
+        for attempt in range(retry_count):
+            try:
+                await self.bot.delete_message(
+                    chat_id=self.config.target_chat_id,
+                    message_id=message_id
+                )
+                logger.debug(f"Message {message_id} deleted successfully")
+                return True
+
+            except TelegramError as e:
+                if "message to delete not found" in str(e).lower():
+                    logger.debug(f"Message {message_id} already deleted or not found")
+                    return True
+
+                if attempt < retry_count - 1:
+                    wait_time = 2 ** attempt
+                    logger.warning(f"Failed to delete message (attempt {attempt + 1}/{retry_count}): {e}")
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to delete message after {retry_count} attempts: {e}")
+                    return False
+
+        return False
+
+    async def send_alert(self, alert_data: Dict[str, Any], zabbix_url: str = None) -> Optional[int]:
+        """Отправляет форматированное уведомление об алерте
+
+        Returns:
+            message_id если успешно, None если ошибка
+        """
         try:
-            message = self._format_alert_message(alert_data)
-            return await self.send_message(message)
-            
+            message, reply_markup = self._format_alert_message(alert_data, zabbix_url)
+            return await self.send_message(message, reply_markup=reply_markup)
+
         except Exception as e:
             logger.error(f"Failed to send alert: {e}")
+            return None
+
+    async def update_alert(self, message_id: int, alert_data: Dict[str, Any],
+                          zabbix_url: str = None) -> bool:
+        """Обновляет существующее сообщение об алерте
+
+        Returns:
+            True если успешно, False если ошибка
+        """
+        try:
+            message, reply_markup = self._format_alert_message(alert_data, zabbix_url)
+            return await self.edit_message(message_id, message, reply_markup=reply_markup)
+
+        except Exception as e:
+            logger.error(f"Failed to update alert: {e}")
             return False
     
-    def _format_alert_message(self, alert_data: Dict[str, Any]) -> str:
-        """Форматирует сообщение об алерте"""
+    def _format_alert_message(self, alert_data: Dict[str, Any],
+                             zabbix_url: str = None) -> tuple[str, Optional[InlineKeyboardMarkup]]:
+        """Форматирует сообщение об алерте
+
+        Returns:
+            tuple: (formatted_message, inline_keyboard_markup)
+        """
         problem = alert_data.get("problem", {})
         trigger = alert_data.get("trigger", {})
         hosts = alert_data.get("hosts", [])
-        
+
         # Определяем серьезность
         severity_map = {
             "0": "🟢 Not classified",
-            "1": "🔵 Information", 
+            "1": "🔵 Information",
             "2": "🟡 Warning",
             "3": "🟠 Average",
             "4": "🔴 High",
             "5": "🔥 Disaster"
         }
-        
+
         severity = severity_map.get(problem.get("severity", "0"), "❓ Unknown")
-        
+
         # Основная информация
         host_name = hosts[0]["name"] if hosts else "Unknown Host"
         host_ip = ""
@@ -180,19 +276,36 @@ class TelegramBot:
             interfaces = hosts[0]["interfaces"]
             if interfaces:
                 host_ip = f" ({interfaces[0].get('ip', 'N/A')})"
-        
+
         problem_name = problem.get("name", "Unknown Problem")
         trigger_description = trigger.get("description", "No description")
-        
+
         # Время события
         event_time = problem.get("clock", "")
         if event_time:
             from datetime import datetime
             event_time = datetime.fromtimestamp(int(event_time)).strftime("%Y-%m-%d %H:%M:%S")
-        
-        # Формируем сообщение
+
+        # Определяем статус с визуальными индикаторами
+        is_resolved = problem.get("r_eventid", "0") != "0"
+        acknowledged = problem.get("acknowledged", "0") == "1"
+
+        if is_resolved:
+            status_icon = "✅"
+            status_text = "RESOLVED"
+            alert_header = "✅ <b>Zabbix Alert - RESOLVED</b>"
+        elif acknowledged:
+            status_icon = "🔕"
+            status_text = "ACKNOWLEDGED"
+            alert_header = "🔕 <b>Zabbix Alert - ACKNOWLEDGED</b>"
+        else:
+            status_icon = "🔴"
+            status_text = "PROBLEM"
+            alert_header = "🚨 <b>Zabbix Alert - ACTIVE</b>"
+
+        # Формируем сообщение с визуальными индикаторами
         message = f"""
-🚨 <b>Zabbix Alert</b>
+{alert_header}
 
 {severity}
 <b>Host:</b> {host_name}{host_ip}
@@ -201,9 +314,18 @@ class TelegramBot:
 <b>Time:</b> {event_time}
 <b>Event ID:</b> {problem.get("eventid", "N/A")}
 
-<b>Status:</b> {"🔴 PROBLEM" if problem.get("r_eventid", "0") == "0" else "🟢 RESOLVED"}
+<b>Status:</b> {status_icon} {status_text}
 """.strip()
-        
+
+        # Добавляем время решения проблемы
+        if is_resolved and problem.get("r_clock"):
+            try:
+                from datetime import datetime
+                resolved_time = datetime.fromtimestamp(int(problem.get("r_clock"))).strftime("%Y-%m-%d %H:%M:%S")
+                message += f"\n<b>Resolved at:</b> {resolved_time}"
+            except:
+                pass
+
         # Добавляем теги если есть
         if problem.get("tags"):
             tags = []
@@ -213,15 +335,26 @@ class TelegramBot:
                     tags.append(f"{tag['tag']}:{tag_value}")
                 else:
                     tags.append(tag["tag"])
-            
+
             if tags:
                 message += f"\n<b>Tags:</b> {', '.join(tags)}"
-        
+
         # Добавляем комментарии к триггеру если есть
         if trigger.get("comments"):
             message += f"\n<b>Comments:</b> {trigger['comments']}"
-            
-        return message
+
+        # Создаем inline-кнопки
+        keyboard = []
+        if zabbix_url and problem.get("eventid"):
+            # Кнопка для перехода в Zabbix
+            event_id = problem.get("eventid")
+            # URL формат: https://zabbix.server/zabbix.php?action=problem.view&filter_eventids[]={event_id}
+            zabbix_event_url = f"{zabbix_url.rstrip('/')}/zabbix.php?action=problem.view&filter_eventids[]={event_id}"
+            keyboard.append([InlineKeyboardButton("🔗 View in Zabbix", url=zabbix_event_url)])
+
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+
+        return message, reply_markup
     
     async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /start"""
