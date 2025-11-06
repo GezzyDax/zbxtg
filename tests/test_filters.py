@@ -5,7 +5,9 @@ from typing import Dict
 from filters import AlertFilters
 
 
-def make_problem(severity: str = "3", resolved: bool = False, host_group: str = "Web") -> Dict[str, object]:
+def make_problem(
+    severity: str = "3", resolved: bool = False, host_group: str = "Web"
+) -> Dict[str, object]:
     """Helper to build a problem payload."""
     problem = {
         "problem": {

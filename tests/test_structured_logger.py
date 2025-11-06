@@ -8,7 +8,9 @@ import pytest
 from structured_logger import StructuredLogger, setup_structured_logging
 
 
-def test_setup_structured_logging_creates_handlers(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+def test_setup_structured_logging_creates_handlers(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.DEBUG)
     log_dir = tmp_path / "logs"
     log_file = log_dir / "app.log"

@@ -54,9 +54,7 @@ class TelegramBot:
             application.add_handler(
                 CommandHandler("problems", self._problems_command, filters=auth_filter)
             )
-            application.add_handler(
-                CommandHandler("test", self._test_command, filters=auth_filter)
-            )
+            application.add_handler(CommandHandler("test", self._test_command, filters=auth_filter))
 
             # Обработчик неизвестных команд (только для авторизованного пользователя)
             application.add_handler(
@@ -337,9 +335,7 @@ class TelegramBot:
         event_time = problem.get("clock", "")
         if event_time:
             try:
-                event_time = datetime.fromtimestamp(int(event_time)).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
+                event_time = datetime.fromtimestamp(int(event_time)).strftime("%Y-%m-%d %H:%M:%S")
             except (TypeError, ValueError):
                 event_time = "Неизвестно"
 

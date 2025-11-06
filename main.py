@@ -119,7 +119,9 @@ class ZabbixTelegramBot:
     async def send_startup_message(self) -> None:
         """Отправляет сообщение о запуске бота"""
         if self.telegram_bot is None:
-            self.logger.warning("Telegram бот не инициализирован, стартовое сообщение не отправлено")
+            self.logger.warning(
+                "Telegram бот не инициализирован, стартовое сообщение не отправлено"
+            )
             return
 
         try:
