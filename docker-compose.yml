@@ -12,12 +12,12 @@ services:
       - ZABBIX_USERNAME=${ZABBIX_USERNAME}
       - ZABBIX_PASSWORD=${ZABBIX_PASSWORD}
       - ZABBIX_SSL_VERIFY=${ZABBIX_SSL_VERIFY:-true}
-      
+
       # Настройки Telegram
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TELEGRAM_PARSE_MODE=HTML
-      
+
       # Дополнительные настройки
       - POLL_INTERVAL=${POLL_INTERVAL:-60}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -26,8 +26,24 @@ services:
     volumes:
       # Монтируем логи для просмотра
       - ./logs:/app/logs
-    networks:
-      - zbxtg-network
+
+    # Исправление DNS: используем сеть хоста для доступа к локальным доменам
+    # Вариант 1: network_mode host (используйте этот вариант)
+    network_mode: host
+
+    # Вариант 2: extra_hosts (закомментирован, используйте если знаете IP)
+    # Раскомментируйте и укажите правильный IP адрес zabbix.ukmrt.local
+    # extra_hosts:
+    #   - "zabbix.ukmrt.local:192.168.1.100"  # Замените на реальный IP
+
+    # Вариант 3: указание DNS серверов (не сработает для .local доменов)
+    # dns:
+    #   - 192.168.1.1  # Замените на DNS сервер вашей локальной сети
+    #   - 8.8.8.8
+
+    # networks удалены, т.к. несовместимы с network_mode: host
+    # networks:
+    #   - zbxtg-network
     # Ограничения ресурсов
     deploy:
       resources:
