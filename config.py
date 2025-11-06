@@ -30,6 +30,9 @@ class AppConfig:
     max_retries: int = 3
     retry_delay: int = 5
     min_severity: int = 2  # Минимальная серьезность для отправки алертов (0-5)
+    edit_on_update: bool = True  # Редактировать сообщения при обновлении статуса
+    delete_resolved_after: int = 3600  # Удалять resolved алерты через N секунд (0 = не удалять)
+    mark_resolved: bool = True  # Помечать resolved алерты вместо удаления
 
 
 def get_config() -> AppConfig:
@@ -128,6 +131,17 @@ def get_config() -> AppConfig:
         parse_mode=os.getenv('TELEGRAM_PARSE_MODE', 'HTML')
     )
 
+    # Параметры UX улучшений
+    edit_on_update = os.getenv('EDIT_ON_UPDATE', 'true').lower() == 'true'
+    mark_resolved = os.getenv('MARK_RESOLVED', 'true').lower() == 'true'
+
+    try:
+        delete_resolved_after = int(os.getenv('DELETE_RESOLVED_AFTER', '3600'))
+        if delete_resolved_after < 0:
+            raise ValueError("DELETE_RESOLVED_AFTER не может быть отрицательным")
+    except ValueError as e:
+        raise ValueError(f"Некорректное значение DELETE_RESOLVED_AFTER: {e}")
+
     return AppConfig(
         zabbix=zabbix_config,
         telegram=telegram_config,
@@ -135,5 +149,8 @@ def get_config() -> AppConfig:
         log_level=log_level,
         max_retries=max_retries,
         retry_delay=retry_delay,
-        min_severity=min_severity
+        min_severity=min_severity,
+        edit_on_update=edit_on_update,
+        delete_resolved_after=delete_resolved_after,
+        mark_resolved=mark_resolved
     )
