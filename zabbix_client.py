@@ -108,12 +108,12 @@ class ZabbixClient:
         """Аутентификация в Zabbix"""
         # Если используется API токен, аутентификация не требуется
         if self.config.api_token:
-            logger.info("Using API token for Zabbix authentication")
+            logger.info("Использование API токена для аутентификации в Zabbix")
             return True
             
         # Аутентификация по username/password
         if not (self.config.username and self.config.password):
-            logger.error("No authentication method provided")
+            logger.error("Не предоставлен метод аутентификации")
             return False
             
         try:
@@ -123,11 +123,11 @@ class ZabbixClient:
             })
             
             self.auth_token = result
-            logger.info("Successfully authenticated to Zabbix")
+            logger.info("Успешная аутентификация в Zabbix")
             return True
-            
+
         except ZabbixAPIError as e:
-            logger.error(f"Authentication failed: {e}")
+            logger.error(f"Аутентификация не удалась: {e}")
             return False
     
     def get_problems(self, limit: int = 100) -> List[Dict[str, Any]]:
@@ -146,7 +146,7 @@ class ZabbixClient:
             return problems
             
         except ZabbixAPIError as e:
-            logger.error(f"Failed to get problems: {e}")
+            logger.error(f"Не удалось получить проблемы: {e}")
             return []
     
     def get_triggers(self, trigger_ids: List[str]) -> List[Dict[str, Any]]:
@@ -168,7 +168,7 @@ class ZabbixClient:
             return triggers
             
         except ZabbixAPIError as e:
-            logger.error(f"Failed to get triggers: {e}")
+            logger.error(f"Не удалось получить триггеры: {e}")
             return []
     
     def get_hosts(self, host_ids: List[str]) -> List[Dict[str, Any]]:
@@ -187,7 +187,7 @@ class ZabbixClient:
             return hosts
             
         except ZabbixAPIError as e:
-            logger.error(f"Failed to get hosts: {e}")
+            logger.error(f"Не удалось получить хосты: {e}")
             return []
     
     def get_events(self, event_ids: List[str]) -> List[Dict[str, Any]]:
@@ -206,7 +206,7 @@ class ZabbixClient:
             return events
             
         except ZabbixAPIError as e:
-            logger.error(f"Failed to get events: {e}")
+            logger.error(f"Не удалось получить события: {e}")
             return []
     
     def check_connection(self) -> bool:
@@ -253,5 +253,5 @@ class ZabbixClient:
             }
             
         except Exception as e:
-            logger.error(f"Failed to get problem details: {e}")
+            logger.error(f"Не удалось получить детали проблемы: {e}")
             return {"problem": problem, "trigger": {}, "hosts": []}

@@ -51,10 +51,10 @@ class TelegramBot:
             # Обработчик неизвестных команд (только для авторизованного пользователя)
             self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & auth_filter, self._unknown_message))
 
-            logger.info("Telegram bot initialized successfully")
+            logger.info("Telegram бот успешно инициализирован")
             
         except Exception as e:
-            logger.error(f"Failed to initialize Telegram bot: {e}")
+            logger.error(f"Не удалось инициализировать Telegram бот: {e}")
             raise
     
     async def start(self):
@@ -67,10 +67,10 @@ class TelegramBot:
             await self.application.start()
             await self.application.updater.start_polling()
             
-            logger.info("Telegram bot started and polling for updates")
+            logger.info("Telegram бот запущен и опрашивает обновления")
             
         except Exception as e:
-            logger.error(f"Failed to start Telegram bot: {e}")
+            logger.error(f"Не удалось запустить Telegram бот: {e}")
             raise
     
     async def stop(self):
@@ -80,9 +80,9 @@ class TelegramBot:
                 await self.application.updater.stop()
                 await self.application.stop()
                 await self.application.shutdown()
-                logger.info("Telegram bot stopped")
+                logger.info("Telegram бот остановлен")
             except Exception as e:
-                logger.error(f"Error stopping Telegram bot: {e}")
+                logger.error(f"Ошибка остановки Telegram бота: {e}")
     
     async def send_message(self, message: str, parse_mode: str = None,
                           reply_markup: Optional[InlineKeyboardMarkup] = None,
@@ -98,7 +98,7 @@ class TelegramBot:
             try:
                 # Если сообщение слишком длинное, разбиваем его
                 if len(message) > MAX_MESSAGE_LENGTH:
-                    logger.warning(f"Message too long ({len(message)} chars), splitting...")
+                    logger.warning(f"Сообщение слишком длинное ({len(message)} символов), разбиваем...")
 
                     # Разбиваем сообщение на части
                     parts = []
@@ -149,11 +149,11 @@ class TelegramBot:
             except TelegramError as e:
                 if attempt < retry_count - 1:
                     wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-                    logger.warning(f"Failed to send message (attempt {attempt + 1}/{retry_count}): {e}")
-                    logger.info(f"Retrying in {wait_time}s...")
+                    logger.warning(f"Не удалось отправить сообщение (попытка {attempt + 1}/{retry_count}): {e}")
+                    logger.info(f"Повтор через {wait_time}с...")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"Failed to send message after {retry_count} attempts: {e}")
+                    logger.error(f"Не удалось отправить сообщение после {retry_count} попыток: {e}")
                     return None
 
         return None
@@ -171,21 +171,21 @@ class TelegramBot:
                     reply_markup=reply_markup,
                     disable_web_page_preview=True
                 )
-                logger.debug(f"Message {message_id} edited successfully")
+                logger.debug(f"Сообщение {message_id} успешно отредактировано")
                 return True
 
             except TelegramError as e:
                 if "message is not modified" in str(e).lower():
-                    logger.debug(f"Message {message_id} content unchanged, skipping edit")
+                    logger.debug(f"Содержимое сообщения {message_id} не изменилось, пропуск редактирования")
                     return True
 
                 if attempt < retry_count - 1:
                     wait_time = 2 ** attempt
-                    logger.warning(f"Failed to edit message (attempt {attempt + 1}/{retry_count}): {e}")
-                    logger.info(f"Retrying in {wait_time}s...")
+                    logger.warning(f"Не удалось отредактировать сообщение (попытка {attempt + 1}/{retry_count}): {e}")
+                    logger.info(f"Повтор через {wait_time}с...")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"Failed to edit message after {retry_count} attempts: {e}")
+                    logger.error(f"Не удалось отредактировать сообщение после {retry_count} попыток: {e}")
                     return False
 
         return False
@@ -198,21 +198,21 @@ class TelegramBot:
                     chat_id=self.config.target_chat_id,
                     message_id=message_id
                 )
-                logger.debug(f"Message {message_id} deleted successfully")
+                logger.debug(f"Сообщение {message_id} успешно удалено")
                 return True
 
             except TelegramError as e:
                 if "message to delete not found" in str(e).lower():
-                    logger.debug(f"Message {message_id} already deleted or not found")
+                    logger.debug(f"Сообщение {message_id} уже удалено или не найдено")
                     return True
 
                 if attempt < retry_count - 1:
                     wait_time = 2 ** attempt
-                    logger.warning(f"Failed to delete message (attempt {attempt + 1}/{retry_count}): {e}")
-                    logger.info(f"Retrying in {wait_time}s...")
+                    logger.warning(f"Не удалось удалить сообщение (попытка {attempt + 1}/{retry_count}): {e}")
+                    logger.info(f"Повтор через {wait_time}с...")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"Failed to delete message after {retry_count} attempts: {e}")
+                    logger.error(f"Не удалось удалить сообщение после {retry_count} попыток: {e}")
                     return False
 
         return False
@@ -228,7 +228,7 @@ class TelegramBot:
             return await self.send_message(message, reply_markup=reply_markup)
 
         except Exception as e:
-            logger.error(f"Failed to send alert: {e}")
+            logger.error(f"Не удалось отправить алерт: {e}")
             return None
 
     async def update_alert(self, message_id: int, alert_data: Dict[str, Any],
@@ -243,7 +243,7 @@ class TelegramBot:
             return await self.edit_message(message_id, message, reply_markup=reply_markup)
 
         except Exception as e:
-            logger.error(f"Failed to update alert: {e}")
+            logger.error(f"Не удалось обновить алерт: {e}")
             return False
     
     def _format_alert_message(self, alert_data: Dict[str, Any],
@@ -259,26 +259,26 @@ class TelegramBot:
 
         # Определяем серьезность
         severity_map = {
-            "0": "🟢 Not classified",
-            "1": "🔵 Information",
-            "2": "🟡 Warning",
-            "3": "🟠 Average",
-            "4": "🔴 High",
-            "5": "🔥 Disaster"
+            "0": "🟢 Не классифицировано",
+            "1": "🔵 Информация",
+            "2": "🟡 Предупреждение",
+            "3": "🟠 Средняя",
+            "4": "🔴 Высокая",
+            "5": "🔥 Критическая"
         }
 
-        severity = severity_map.get(problem.get("severity", "0"), "❓ Unknown")
+        severity = severity_map.get(problem.get("severity", "0"), "❓ Неизвестно")
 
         # Основная информация
-        host_name = hosts[0]["name"] if hosts else "Unknown Host"
+        host_name = hosts[0]["name"] if hosts else "Неизвестный хост"
         host_ip = ""
         if hosts and "interfaces" in hosts[0]:
             interfaces = hosts[0]["interfaces"]
             if interfaces:
                 host_ip = f" ({interfaces[0].get('ip', 'N/A')})"
 
-        problem_name = problem.get("name", "Unknown Problem")
-        trigger_description = trigger.get("description", "No description")
+        problem_name = problem.get("name", "Неизвестная проблема")
+        trigger_description = trigger.get("description", "Нет описания")
 
         # Время события
         event_time = problem.get("clock", "")
@@ -292,29 +292,29 @@ class TelegramBot:
 
         if is_resolved:
             status_icon = "✅"
-            status_text = "RESOLVED"
-            alert_header = "✅ <b>Zabbix Alert - RESOLVED</b>"
+            status_text = "РЕШЕНО"
+            alert_header = "✅ <b>Zabbix алерт - РЕШЕНО</b>"
         elif acknowledged:
             status_icon = "🔕"
-            status_text = "ACKNOWLEDGED"
-            alert_header = "🔕 <b>Zabbix Alert - ACKNOWLEDGED</b>"
+            status_text = "ПОДТВЕРЖДЕНО"
+            alert_header = "🔕 <b>Zabbix алерт - ПОДТВЕРЖДЕНО</b>"
         else:
             status_icon = "🔴"
-            status_text = "PROBLEM"
-            alert_header = "🚨 <b>Zabbix Alert - ACTIVE</b>"
+            status_text = "ПРОБЛЕМА"
+            alert_header = "🚨 <b>Zabbix алерт - АКТИВНО</b>"
 
         # Формируем сообщение с визуальными индикаторами
         message = f"""
 {alert_header}
 
 {severity}
-<b>Host:</b> {host_name}{host_ip}
-<b>Problem:</b> {problem_name}
-<b>Description:</b> {trigger_description}
-<b>Time:</b> {event_time}
-<b>Event ID:</b> {problem.get("eventid", "N/A")}
+<b>Хост:</b> {host_name}{host_ip}
+<b>Проблема:</b> {problem_name}
+<b>Описание:</b> {trigger_description}
+<b>Время:</b> {event_time}
+<b>ID события:</b> {problem.get("eventid", "N/A")}
 
-<b>Status:</b> {status_icon} {status_text}
+<b>Статус:</b> {status_icon} {status_text}
 """.strip()
 
         # Добавляем время решения проблемы
@@ -322,7 +322,7 @@ class TelegramBot:
             try:
                 from datetime import datetime
                 resolved_time = datetime.fromtimestamp(int(problem.get("r_clock"))).strftime("%Y-%m-%d %H:%M:%S")
-                message += f"\n<b>Resolved at:</b> {resolved_time}"
+                message += f"\n<b>Решено в:</b> {resolved_time}"
             except:
                 pass
 
@@ -337,11 +337,11 @@ class TelegramBot:
                     tags.append(tag["tag"])
 
             if tags:
-                message += f"\n<b>Tags:</b> {', '.join(tags)}"
+                message += f"\n<b>Теги:</b> {', '.join(tags)}"
 
         # Добавляем комментарии к триггеру если есть
         if trigger.get("comments"):
-            message += f"\n<b>Comments:</b> {trigger['comments']}"
+            message += f"\n<b>Комментарии:</b> {trigger['comments']}"
 
         # Создаем inline-кнопки
         keyboard = []
@@ -350,7 +350,7 @@ class TelegramBot:
             event_id = problem.get("eventid")
             # URL формат: https://zabbix.server/zabbix.php?action=problem.view&filter_eventids[]={event_id}
             zabbix_event_url = f"{zabbix_url.rstrip('/')}/zabbix.php?action=problem.view&filter_eventids[]={event_id}"
-            keyboard.append([InlineKeyboardButton("🔗 View in Zabbix", url=zabbix_event_url)])
+            keyboard.append([InlineKeyboardButton("🔗 Открыть в Zabbix", url=zabbix_event_url)])
 
         reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
@@ -378,8 +378,8 @@ class TelegramBot:
 
 /start - Начать работу с ботом
 /help - Показать это сообщение
-/status - Проверить статус подключения к Zabbix
-/problems - Показать активные проблемы в Zabbix
+/status - Проверить статус мониторинга
+/problems - Показать активные проблемы
 /test - Отправить тестовое уведомление
 
 🔔 Я автоматически отправляю уведомления о проблемах в Zabbix.
@@ -405,18 +405,18 @@ class TelegramBot:
         test_alert = {
             "problem": {
                 "eventid": "12345",
-                "name": "Test Problem",
+                "name": "Тестовая проблема",
                 "severity": "3",
                 "clock": str(int(asyncio.get_event_loop().time())),
                 "r_eventid": "0",
-                "tags": [{"tag": "test", "value": "alert"}]
+                "tags": [{"tag": "тест", "value": "алерт"}]
             },
             "trigger": {
-                "description": "This is a test alert from Zabbix monitoring bot",
-                "comments": "Test trigger for bot verification"
+                "description": "Это тестовый алерт от бота мониторинга Zabbix",
+                "comments": "Тестовый триггер для проверки бота"
             },
             "hosts": [{
-                "name": "Test Host",
+                "name": "Тестовый хост",
                 "interfaces": [{"ip": "192.168.1.100"}]
             }]
         }
@@ -437,8 +437,8 @@ class TelegramBot:
         """Проверяет подключение к Telegram API"""
         try:
             me = await self.bot.get_me()
-            logger.info(f"Connected to Telegram as @{me.username}")
+            logger.info(f"Подключено к Telegram как @{me.username}")
             return True
         except TelegramError as e:
-            logger.error(f"Failed to connect to Telegram: {e}")
+            logger.error(f"Не удалось подключиться к Telegram: {e}")
             return False

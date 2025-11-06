@@ -51,7 +51,7 @@ class AlertMonitor:
         self.stats["start_time"] = datetime.now()
         self.last_check_time = int(time.time()) - self.config.poll_interval
         
-        logger.info(f"Starting alert monitoring with {self.config.poll_interval}s interval")
+        logger.info(f"Запуск мониторинга алертов с интервалом {self.config.poll_interval}с")
         
         while self.is_running:
             try:
@@ -74,11 +74,11 @@ class AlertMonitor:
 
                 # Попытка переподключения к Zabbix
                 if isinstance(e, ZabbixAPIError):
-                    logger.info("Attempting to reconnect to Zabbix...")
+                    logger.info("Попытка переподключения к Zabbix...")
                     try:
                         await asyncio.to_thread(self.zabbix_client.check_connection)
                     except Exception as reconnect_error:
-                        logger.error(f"Failed to reconnect to Zabbix: {reconnect_error}")
+                        logger.error(f"Не удалось переподключиться к Zabbix: {reconnect_error}")
 
             # Ждем до следующей проверки
             if self.is_running:
@@ -87,7 +87,7 @@ class AlertMonitor:
     def stop_monitoring(self):
         """Останавливает мониторинг"""
         self.is_running = False
-        logger.info("Alert monitoring stopped")
+        logger.info("Мониторинг алертов остановлен")
     
     async def _check_for_alerts(self):
         """Проверяет новые алерты"""
@@ -96,7 +96,7 @@ class AlertMonitor:
             problems = await asyncio.to_thread(self.zabbix_client.get_problems, 50)
             
             if not problems:
-                logger.debug("No problems found in Zabbix")
+                logger.debug("В Zabbix не найдено проблем")
                 return
             
             self.stats["problems_found"] += len(problems)
@@ -119,7 +119,7 @@ class AlertMonitor:
                 new_problems.append(problem)
             
             if new_problems:
-                logger.info(f"Found {len(new_problems)} new problems")
+                logger.info(f"Найдено {len(new_problems)} новых проблем")
                 
                 # Обрабатываем новые проблемы
                 for problem in new_problems:
@@ -148,7 +148,7 @@ class AlertMonitor:
 
             # Применяем фильтры (при необходимости)
             if not self._should_send_alert(problem_details):
-                logger.debug(f"Alert {problem_id} filtered out")
+                logger.debug(f"Алерт {problem_id} отфильтрован")
                 return
 
             # Отправляем алерт с inline-кнопкой
@@ -165,16 +165,16 @@ class AlertMonitor:
                     "status": "problem"
                 }
                 self.stats["alerts_sent"] += 1
-                logger.info(f"Alert {problem_id} sent successfully (message_id: {message_id})")
+                logger.info(f"Алерт {problem_id} успешно отправлен (message_id: {message_id})")
             else:
-                logger.error(f"Failed to send alert {problem_id}")
+                logger.error(f"Не удалось отправить алерт {problem_id}")
                 # Сохраняем неотправленный алерт для повторной попытки
                 self.failed_alerts.append({
                     "problem_details": problem_details,
                     "timestamp": time.time(),
                     "attempts": 1
                 })
-                logger.info(f"Alert {problem_id} added to retry queue")
+                logger.info(f"Алерт {problem_id} добавлен в очередь повтора")
 
         except Exception as e:
             logger.error(f"Error processing problem {problem.get('eventid', 'unknown')}: {e}")
@@ -188,7 +188,7 @@ class AlertMonitor:
         severity = int(problem.get("severity", 0))
 
         if severity < self.config.min_severity:
-            logger.debug(f"Alert filtered: severity {severity} < min {self.config.min_severity}")
+            logger.debug(f"Алерт отфильтрован: серьезность {severity} < мин {self.config.min_severity}")
             return False
         
         # Фильтр по статусу (только активные проблемы)
@@ -251,7 +251,7 @@ class AlertMonitor:
 
                     # Обновляем сообщение, если статус изменился
                     if new_status != old_status:
-                        logger.info(f"Alert {event_id} status changed: {old_status} -> {new_status}")
+                        logger.info(f"Статус алерта {event_id} изменен: {old_status} -> {new_status}")
 
                         success = await self.telegram_bot.update_alert(
                             message_id,
@@ -264,14 +264,14 @@ class AlertMonitor:
                             if new_status == "resolved":
                                 alert_info["resolved_at"] = time.time()
                             self.stats["alerts_updated"] += 1
-                            logger.info(f"Alert {event_id} updated successfully")
+                            logger.info(f"Алерт {event_id} успешно обновлен")
                         else:
-                            logger.error(f"Failed to update alert {event_id}")
+                            logger.error(f"Не удалось обновить алерт {event_id}")
 
                 else:
                     # Проблема не найдена в текущем списке - скорее всего resolved
                     if old_status != "resolved":
-                        logger.info(f"Alert {event_id} appears to be resolved (not in active problems)")
+                        logger.info(f"Алерт {event_id} похоже решен (не в активных проблемах)")
                         # Можно попробовать получить информацию из resolved events
                         # Пока просто помечаем как resolved
                         alert_info["status"] = "resolved"
@@ -297,27 +297,27 @@ class AlertMonitor:
                     if time_since_resolved >= self.config.delete_resolved_after:
                         message_id = alert_info.get("message_id")
                         if message_id:
-                            logger.info(f"Deleting resolved alert {event_id} (resolved {int(time_since_resolved)}s ago)")
+                            logger.info(f"Удаление решенного алерта {event_id} (решен {int(time_since_resolved)}с назад)")
 
                             if self.config.mark_resolved:
                                 # Просто оставляем сообщение с пометкой RESOLVED, не удаляем
-                                logger.debug(f"Alert {event_id} marked as resolved, not deleting (MARK_RESOLVED=true)")
+                                logger.debug(f"Алерт {event_id} помечен как решенный, не удаляется (MARK_RESOLVED=true)")
                             else:
                                 # Удаляем сообщение
                                 success = await self.telegram_bot.delete_message(message_id)
                                 if success:
                                     to_delete.append(event_id)
                                     self.stats["alerts_deleted"] += 1
-                                    logger.info(f"Alert {event_id} deleted successfully")
+                                    logger.info(f"Алерт {event_id} успешно удален")
                                 else:
-                                    logger.error(f"Failed to delete alert {event_id}")
+                                    logger.error(f"Не удалось удалить алерт {event_id}")
 
             # Удаляем из отслеживания
             for event_id in to_delete:
                 del self.sent_alerts[event_id]
 
             if to_delete:
-                logger.info(f"Deleted {len(to_delete)} resolved alerts")
+                logger.info(f"Удалено {len(to_delete)} решенных алертов")
 
         except Exception as e:
             logger.error(f"Error cleaning up resolved alerts: {e}")
@@ -339,7 +339,7 @@ class AlertMonitor:
                     del self.sent_alerts[event_id]
 
                 if old_alerts:
-                    logger.debug(f"Cleaned up {len(old_alerts)} old alerts from memory")
+                    logger.debug(f"Очищено {len(old_alerts)} старых алертов из памяти")
 
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}")
@@ -349,7 +349,7 @@ class AlertMonitor:
         if not self.failed_alerts:
             return
 
-        logger.info(f"Retrying {len(self.failed_alerts)} failed alerts...")
+        logger.info(f"Повторная попытка отправки {len(self.failed_alerts)} неудавшихся алертов...")
         still_failed = []
 
         for alert_info in self.failed_alerts:
@@ -359,7 +359,7 @@ class AlertMonitor:
 
             # Максимум 5 попыток
             if attempts >= 5:
-                logger.warning(f"Alert {problem_id} exceeded max retry attempts, dropping")
+                logger.warning(f"Алерт {problem_id} превысил максимальное количество попыток, отбрасывается")
                 continue
 
             message_id = await self.telegram_bot.send_alert(
@@ -374,14 +374,14 @@ class AlertMonitor:
                     "status": "problem"
                 }
                 self.stats["alerts_sent"] += 1
-                logger.info(f"Alert {problem_id} sent successfully on retry #{attempts}")
+                logger.info(f"Алерт {problem_id} успешно отправлен при повторе #{attempts}")
             else:
                 alert_info["attempts"] += 1
                 still_failed.append(alert_info)
-                logger.debug(f"Alert {problem_id} still failed (attempt #{attempts + 1})")
+                logger.debug(f"Алерт {problem_id} все еще не отправлен (попытка #{attempts + 1})")
 
         self.failed_alerts = still_failed
-        logger.debug(f"{len(self.failed_alerts)} alerts still in retry queue")
+        logger.debug(f"{len(self.failed_alerts)} алертов все еще в очереди повтора")
 
     async def get_status(self) -> Dict[str, Any]:
         """Возвращает статус мониторинга"""
@@ -422,29 +422,29 @@ class AlertMonitor:
             status = await self.get_status()
             
             message = f"""
-📊 <b>Zabbix Monitor Status</b>
+📊 <b>Статус Zabbix монитора</b>
 
-🔄 <b>Monitoring:</b> {"✅ Running" if status["running"] else "❌ Stopped"}
-⏱ <b>Uptime:</b> {status.get("uptime_str", "N/A")}
+🔄 <b>Мониторинг:</b> {"✅ Работает" if status["running"] else "❌ Остановлен"}
+⏱ <b>Время работы:</b> {status.get("uptime_str", "N/A")}
 
-📡 <b>Connections:</b>
+📡 <b>Подключения:</b>
 - Zabbix: {"✅" if status["zabbix_connected"] else "❌"}
 - Telegram: {"✅" if status["telegram_connected"] else "❌"}
 
-📈 <b>Statistics:</b>
-- Total checks: {status["stats"]["total_checks"]}
-- Problems found: {status["stats"]["problems_found"]}
-- Alerts sent: {status["stats"]["alerts_sent"]}
-- Alerts updated: {status["stats"].get("alerts_updated", 0)}
-- Alerts deleted: {status["stats"].get("alerts_deleted", 0)}
-- Errors: {status["stats"]["errors"]}
+📈 <b>Статистика:</b>
+- Всего проверок: {status["stats"]["total_checks"]}
+- Найдено проблем: {status["stats"]["problems_found"]}
+- Алертов отправлено: {status["stats"]["alerts_sent"]}
+- Алертов обновлено: {status["stats"].get("alerts_updated", 0)}
+- Алертов удалено: {status["stats"].get("alerts_deleted", 0)}
+- Ошибок: {status["stats"]["errors"]}
 
-💾 <b>Memory:</b> {status["sent_alerts_count"]} tracked alerts
-🔄 <b>Retry queue:</b> {status["failed_alerts_count"]} pending
+💾 <b>Память:</b> {status["sent_alerts_count"]} отслеживаемых алертов
+🔄 <b>Очередь повтора:</b> {status["failed_alerts_count"]} в ожидании
             """.strip()
-            
+
             if status["stats"]["last_error"]:
-                message += f"\n\n❌ <b>Last error:</b> {status['stats']['last_error']}"
+                message += f"\n\n❌ <b>Последняя ошибка:</b> {status['stats']['last_error']}"
             
             await self.telegram_bot.send_message(message)
             
@@ -488,8 +488,8 @@ class AlertMonitor:
                         time_str = "Unknown"
                     
                     message += f"{icon} <b>{problem.get('name', 'Unknown')}</b>\n"
-                    message += f"   📍 Host: {host_name}\n"
-                    message += f"   ⏰ Time: {time_str}\n\n"
+                    message += f"   📍 Хост: {host_name}\n"
+                    message += f"   ⏰ Время: {time_str}\n\n"
                 
                 if len(problems) > 10:
                     message += f"... и еще {len(problems) - 10} проблем"
