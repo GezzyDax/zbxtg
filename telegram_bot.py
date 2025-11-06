@@ -29,21 +29,28 @@ class TelegramBot:
         """Устанавливает ссылку на alert_monitor"""
         self.alert_monitor = alert_monitor
         
+    def _authorized_user_filter(self):
+        """Создает фильтр для проверки авторизованного пользователя"""
+        return filters.User(user_id=self.config.target_chat_id)
+
     async def initialize(self):
         """Инициализация бота"""
         try:
             self.application = Application.builder().token(self.config.bot_token).build()
-            
-            # Добавляем обработчики команд
+
+            # Фильтр для проверки авторизации
+            auth_filter = self._authorized_user_filter()
+
+            # Добавляем обработчики команд с фильтром авторизации
             self.application.add_handler(CommandHandler("start", self._start_command))
-            self.application.add_handler(CommandHandler("help", self._help_command))
-            self.application.add_handler(CommandHandler("status", self._status_command))
-            self.application.add_handler(CommandHandler("problems", self._problems_command))
-            self.application.add_handler(CommandHandler("test", self._test_command))
-            
-            # Обработчик неизвестных команд
-            self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._unknown_message))
-            
+            self.application.add_handler(CommandHandler("help", self._help_command, filters=auth_filter))
+            self.application.add_handler(CommandHandler("status", self._status_command, filters=auth_filter))
+            self.application.add_handler(CommandHandler("problems", self._problems_command, filters=auth_filter))
+            self.application.add_handler(CommandHandler("test", self._test_command, filters=auth_filter))
+
+            # Обработчик неизвестных команд (только для авторизованного пользователя)
+            self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & auth_filter, self._unknown_message))
+
             logger.info("Telegram bot initialized successfully")
             
         except Exception as e:
@@ -77,22 +84,66 @@ class TelegramBot:
             except Exception as e:
                 logger.error(f"Error stopping Telegram bot: {e}")
     
-    async def send_message(self, message: str, parse_mode: str = None) -> bool:
-        """Отправляет сообщение целевому пользователю"""
-        try:
-            await self.bot.send_message(
-                chat_id=self.config.target_chat_id,
-                text=message,
-                parse_mode=parse_mode or self.config.parse_mode,
-                disable_web_page_preview=True
-            )
-            
-            logger.debug(f"Message sent to chat {self.config.target_chat_id}")
-            return True
-            
-        except TelegramError as e:
-            logger.error(f"Failed to send message: {e}")
-            return False
+    async def send_message(self, message: str, parse_mode: str = None, retry_count: int = 3) -> bool:
+        """Отправляет сообщение целевому пользователю с retry механизмом"""
+        MAX_MESSAGE_LENGTH = 4096
+
+        for attempt in range(retry_count):
+            try:
+                # Если сообщение слишком длинное, разбиваем его
+                if len(message) > MAX_MESSAGE_LENGTH:
+                    logger.warning(f"Message too long ({len(message)} chars), splitting...")
+
+                    # Разбиваем сообщение на части
+                    parts = []
+                    msg_copy = message
+                    while msg_copy:
+                        if len(msg_copy) <= MAX_MESSAGE_LENGTH:
+                            parts.append(msg_copy)
+                            break
+
+                        # Находим последний перенос строки в пределах лимита
+                        split_pos = msg_copy.rfind('\n', 0, MAX_MESSAGE_LENGTH)
+                        if split_pos == -1:
+                            # Если нет переносов, режем по лимиту
+                            split_pos = MAX_MESSAGE_LENGTH
+
+                        parts.append(msg_copy[:split_pos])
+                        msg_copy = msg_copy[split_pos:].lstrip()
+
+                    # Отправляем все части
+                    for i, part in enumerate(parts, 1):
+                        header = f"📄 Часть {i}/{len(parts)}\n\n" if len(parts) > 1 else ""
+                        await self.bot.send_message(
+                            chat_id=self.config.target_chat_id,
+                            text=header + part,
+                            parse_mode=parse_mode or self.config.parse_mode,
+                            disable_web_page_preview=True
+                        )
+                        logger.debug(f"Message part {i}/{len(parts)} sent")
+
+                else:
+                    await self.bot.send_message(
+                        chat_id=self.config.target_chat_id,
+                        text=message,
+                        parse_mode=parse_mode or self.config.parse_mode,
+                        disable_web_page_preview=True
+                    )
+                    logger.debug(f"Message sent to chat {self.config.target_chat_id}")
+
+                return True
+
+            except TelegramError as e:
+                if attempt < retry_count - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(f"Failed to send message (attempt {attempt + 1}/{retry_count}): {e}")
+                    logger.info(f"Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to send message after {retry_count} attempts: {e}")
+                    return False
+
+        return False
     
     async def send_alert(self, alert_data: Dict[str, Any]) -> bool:
         """Отправляет форматированное уведомление об алерте"""
@@ -189,10 +240,7 @@ class TelegramBot:
     
     async def _help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /help"""
-        user_id = update.effective_user.id
-        
-        if user_id == self.config.target_chat_id:
-            help_text = """
+        help_text = """
 📋 <b>Доступные команды:</b>
 
 /start - Начать работу с ботом
@@ -202,77 +250,55 @@ class TelegramBot:
 /test - Отправить тестовое уведомление
 
 🔔 Я автоматически отправляю уведомления о проблемах в Zabbix.
-            """
-            await update.message.reply_text(help_text, parse_mode='HTML')
-        else:
-            await update.message.reply_text("❌ У вас нет доступа к этому боту.")
+        """
+        await update.message.reply_text(help_text, parse_mode='HTML')
     
     async def _status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /status"""
-        user_id = update.effective_user.id
-        
-        if user_id == self.config.target_chat_id:
-            if self.alert_monitor:
-                await self.alert_monitor.send_status_message()
-            else:
-                await update.message.reply_text("❌ Мониторинг не инициализирован.")
+        if self.alert_monitor:
+            await self.alert_monitor.send_status_message()
         else:
-            await update.message.reply_text("❌ У вас нет доступа к этому боту.")
+            await update.message.reply_text("❌ Мониторинг не инициализирован.")
     
     async def _problems_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /problems"""
-        user_id = update.effective_user.id
-        
-        if user_id == self.config.target_chat_id:
-            if self.alert_monitor:
-                await self.alert_monitor.send_problems_list()
-            else:
-                await update.message.reply_text("❌ Мониторинг не инициализирован.")
+        if self.alert_monitor:
+            await self.alert_monitor.send_problems_list()
         else:
-            await update.message.reply_text("❌ У вас нет доступа к этому боту.")
+            await update.message.reply_text("❌ Мониторинг не инициализирован.")
     
     async def _test_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /test"""
-        user_id = update.effective_user.id
-        
-        if user_id == self.config.target_chat_id:
-            test_alert = {
-                "problem": {
-                    "eventid": "12345",
-                    "name": "Test Problem",
-                    "severity": "3",
-                    "clock": str(int(asyncio.get_event_loop().time())),
-                    "r_eventid": "0",
-                    "tags": [{"tag": "test", "value": "alert"}]
-                },
-                "trigger": {
-                    "description": "This is a test alert from Zabbix monitoring bot",
-                    "comments": "Test trigger for bot verification"
-                },
-                "hosts": [{
-                    "name": "Test Host",
-                    "interfaces": [{"ip": "192.168.1.100"}]
-                }]
-            }
-            
-            success = await self.send_alert(test_alert)
-            if success:
-                await update.message.reply_text("✅ Тестовое уведомление отправлено!")
-            else:
-                await update.message.reply_text("❌ Ошибка при отправке тестового уведомления.")
+        test_alert = {
+            "problem": {
+                "eventid": "12345",
+                "name": "Test Problem",
+                "severity": "3",
+                "clock": str(int(asyncio.get_event_loop().time())),
+                "r_eventid": "0",
+                "tags": [{"tag": "test", "value": "alert"}]
+            },
+            "trigger": {
+                "description": "This is a test alert from Zabbix monitoring bot",
+                "comments": "Test trigger for bot verification"
+            },
+            "hosts": [{
+                "name": "Test Host",
+                "interfaces": [{"ip": "192.168.1.100"}]
+            }]
+        }
+
+        success = await self.send_alert(test_alert)
+        if success:
+            await update.message.reply_text("✅ Тестовое уведомление отправлено!")
         else:
-            await update.message.reply_text("❌ У вас нет доступа к этому боту.")
+            await update.message.reply_text("❌ Ошибка при отправке тестового уведомления.")
     
     async def _unknown_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик неизвестных сообщений"""
-        user_id = update.effective_user.id
-        
-        if user_id == self.config.target_chat_id:
-            await update.message.reply_text(
-                "🤖 Я понимаю только команды. Используйте /help для получения списка доступных команд."
-            )
-        else:
-            await update.message.reply_text("❌ У вас нет доступа к этому боту.")
+        await update.message.reply_text(
+            "🤖 Я понимаю только команды. Используйте /help для получения списка доступных команд."
+        )
     
     async def check_connection(self) -> bool:
         """Проверяет подключение к Telegram API"""

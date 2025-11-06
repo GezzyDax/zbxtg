@@ -24,6 +24,11 @@ class ZabbixClient:
         self.session = self._create_session()
         self.auth_token: Optional[str] = None
         self.request_id = 1
+        self.timeout = 30  # Timeout для HTTP запросов в секундах
+
+        # Rate limiting
+        self.last_request_time = 0
+        self.min_request_interval = 0.1  # Минимум 100ms между запросами
         
     def _create_session(self) -> requests.Session:
         """Создает HTTP сессию с retry-стратегией"""
@@ -45,39 +50,51 @@ class ZabbixClient:
             session.verify = '/etc/ssl/certs/ca-certificates.crt'
         else:
             session.verify = False
-        session.timeout = 30
-        
+
         return session
     
     def _make_request(self, method: str, params: Dict[str, Any] = None, skip_auth: bool = False) -> Dict[str, Any]:
         """Выполняет запрос к Zabbix API"""
+        # Rate limiting
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        if time_since_last_request < self.min_request_interval:
+            sleep_time = self.min_request_interval - time_since_last_request
+            logger.debug(f"Rate limiting: sleeping {sleep_time:.3f}s")
+            time.sleep(sleep_time)
+
         url = f"{self.config.url.rstrip('/')}/api_jsonrpc.php"
-        
+
         payload = {
             "jsonrpc": "2.0",
             "method": method,
             "params": params or {},
             "id": self.request_id
         }
-        
+
         # Используем API токен или auth токен (если не пропускаем auth)
         if not skip_auth:
             if self.config.api_token:
                 payload["auth"] = self.config.api_token
             elif self.auth_token and method != "user.login":
                 payload["auth"] = self.auth_token
-            
+
         self.request_id += 1
-        
+        logger.debug(f"Zabbix API request: {method}")
+
         try:
-            response = self.session.post(url, json=payload)
+            response = self.session.post(url, json=payload, timeout=self.timeout)
+            self.last_request_time = time.time()
             response.raise_for_status()
             
             result = response.json()
-            
+
             if "error" in result:
-                raise ZabbixAPIError(f"Zabbix API error: {result['error']}")
-                
+                error_msg = result['error']
+                logger.error(f"Zabbix API error for {method}: {error_msg}")
+                raise ZabbixAPIError(f"Zabbix API error: {error_msg}")
+
+            logger.debug(f"Zabbix API response for {method}: success")
             return result.get("result", {})
             
         except requests.RequestException as e:

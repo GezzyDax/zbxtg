@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 
 @dataclass
@@ -28,57 +29,111 @@ class AppConfig:
     log_level: str = "INFO"
     max_retries: int = 3
     retry_delay: int = 5
+    min_severity: int = 2  # Минимальная серьезность для отправки алертов (0-5)
 
 
 def get_config() -> AppConfig:
     """Получает конфигурацию из переменных окружения"""
-    
+
     # Обязательные параметры
     required_vars = {
         'ZABBIX_URL': 'URL Zabbix сервера',
         'TELEGRAM_BOT_TOKEN': 'Токен Telegram бота',
         'TELEGRAM_CHAT_ID': 'ID пользователя Telegram'
     }
-    
+
     missing_vars = []
     for var, description in required_vars.items():
         if not os.getenv(var):
             missing_vars.append(f"{var} ({description})")
-    
+
     if missing_vars:
-        raise ValueError(f"Отсутствуют обязательные переменные окружения:\n" + 
+        raise ValueError(f"Отсутствуют обязательные переменные окружения:\n" +
                         "\n".join(f"- {var}" for var in missing_vars))
-    
+
+    # Валидация URL
+    zabbix_url = os.getenv('ZABBIX_URL')
+    try:
+        parsed_url = urlparse(zabbix_url)
+        if not all([parsed_url.scheme, parsed_url.netloc]):
+            raise ValueError(f"Некорректный формат ZABBIX_URL: {zabbix_url}")
+        if parsed_url.scheme not in ['http', 'https']:
+            raise ValueError(f"ZABBIX_URL должен начинаться с http:// или https://")
+    except Exception as e:
+        raise ValueError(f"Ошибка валидации ZABBIX_URL: {e}")
+
     # Проверяем аутентификацию Zabbix
     api_token = os.getenv('ZABBIX_API_TOKEN')
     username = os.getenv('ZABBIX_USERNAME')
     password = os.getenv('ZABBIX_PASSWORD')
-    
+
     if not api_token and not (username and password):
         raise ValueError(
             "Необходимо указать либо ZABBIX_API_TOKEN, либо ZABBIX_USERNAME и ZABBIX_PASSWORD"
         )
-    
+
+    # Валидация численных параметров
+    try:
+        poll_interval = int(os.getenv('POLL_INTERVAL', '60'))
+        if poll_interval <= 0:
+            raise ValueError("POLL_INTERVAL должен быть больше 0")
+    except ValueError as e:
+        raise ValueError(f"Некорректное значение POLL_INTERVAL: {e}")
+
+    try:
+        max_retries = int(os.getenv('MAX_RETRIES', '3'))
+        if max_retries < 0:
+            raise ValueError("MAX_RETRIES не может быть отрицательным")
+    except ValueError as e:
+        raise ValueError(f"Некорректное значение MAX_RETRIES: {e}")
+
+    try:
+        retry_delay = int(os.getenv('RETRY_DELAY', '5'))
+        if retry_delay < 0:
+            raise ValueError("RETRY_DELAY не может быть отрицательным")
+    except ValueError as e:
+        raise ValueError(f"Некорректное значение RETRY_DELAY: {e}")
+
+    try:
+        min_severity = int(os.getenv('MIN_SEVERITY', '2'))
+        if not 0 <= min_severity <= 5:
+            raise ValueError("MIN_SEVERITY должен быть в диапазоне 0-5")
+    except ValueError as e:
+        raise ValueError(f"Некорректное значение MIN_SEVERITY: {e}")
+
+    # Валидация chat_id
+    try:
+        chat_id = int(os.getenv('TELEGRAM_CHAT_ID'))
+    except ValueError:
+        raise ValueError("TELEGRAM_CHAT_ID должен быть числом")
+
+    # Валидация log level
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+    valid_log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+    if log_level not in valid_log_levels:
+        raise ValueError(f"LOG_LEVEL должен быть одним из: {', '.join(valid_log_levels)}")
+
     zabbix_config = ZabbixConfig(
-        url=os.getenv('ZABBIX_URL'),
+        url=zabbix_url,
         username=username,
         password=password,
         api_token=api_token,
         ssl_verify=os.getenv('ZABBIX_SSL_VERIFY', 'true').lower() == 'true',
         ssl_cert_path=os.getenv('ZABBIX_SSL_CERT_PATH')
     )
-    
+
     telegram_config = TelegramConfig(
         bot_token=os.getenv('TELEGRAM_BOT_TOKEN'),
-        target_chat_id=int(os.getenv('TELEGRAM_CHAT_ID')),
+        target_chat_id=chat_id,
         parse_mode=os.getenv('TELEGRAM_PARSE_MODE', 'HTML')
     )
-    
+
     return AppConfig(
         zabbix=zabbix_config,
         telegram=telegram_config,
-        poll_interval=int(os.getenv('POLL_INTERVAL', '60')),
-        log_level=os.getenv('LOG_LEVEL', 'INFO'),
-        max_retries=int(os.getenv('MAX_RETRIES', '3')),
-        retry_delay=int(os.getenv('RETRY_DELAY', '5'))
+        poll_interval=poll_interval,
+        log_level=log_level,
+        max_retries=max_retries,
+        retry_delay=retry_delay,
+        min_severity=min_severity
     )

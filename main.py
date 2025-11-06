@@ -150,32 +150,38 @@ Use /help to see available commands.
         """Запускает основной цикл приложения"""
         try:
             await self.initialize()
-            
+
             # Запускаем компоненты параллельно
             tasks = [
                 asyncio.create_task(self.telegram_bot.start(), name="telegram_bot"),
                 asyncio.create_task(self.alert_monitor.start_monitoring(), name="alert_monitor")
             ]
-            
+
             # Добавляем обработчик сигналов для корректной остановки
+            loop = asyncio.get_event_loop()
+
             def signal_handler():
                 self.logger.info("Received shutdown signal")
+                self.alert_monitor.stop_monitoring()
                 for task in tasks:
                     task.cancel()
-                self.alert_monitor.stop_monitoring()
-            
-            # Устанавливаем обработчики сигналов
+
+            # Устанавливаем обработчики сигналов через event loop
             for sig in [signal.SIGTERM, signal.SIGINT]:
-                signal.signal(sig, lambda s, f: signal_handler())
-            
+                loop.add_signal_handler(sig, signal_handler)
+
             self.logger.info("Bot is running. Press Ctrl+C to stop.")
-            
+
             # Ждем завершения всех задач
             try:
                 await asyncio.gather(*tasks)
             except asyncio.CancelledError:
                 self.logger.info("Tasks cancelled, shutting down...")
-            
+            finally:
+                # Удаляем обработчики сигналов
+                for sig in [signal.SIGTERM, signal.SIGINT]:
+                    loop.remove_signal_handler(sig)
+
         except KeyboardInterrupt:
             self.logger.info("Received keyboard interrupt")
         except Exception as e:
