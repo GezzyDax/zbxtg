@@ -1,6 +1,6 @@
 import os
-from typing import Optional
-from dataclasses import dataclass
+from typing import Optional, List
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 
@@ -33,6 +33,16 @@ class AppConfig:
     edit_on_update: bool = True  # Редактировать сообщения при обновлении статуса
     delete_resolved_after: int = 3600  # Удалять resolved алерты через N секунд (0 = не удалять)
     mark_resolved: bool = True  # Помечать resolved алерты вместо удаления
+
+    # Фильтры
+    host_groups: Optional[list] = None  # Группы хостов для фильтрации
+    excluded_hosts: Optional[list] = None  # Исключенные хосты
+
+    # Тихие часы
+    quiet_hours_enabled: bool = False
+    quiet_hours_start: str = "22:00"
+    quiet_hours_end: str = "08:00"
+    quiet_hours_min_severity: int = 4
 
 
 def get_config() -> AppConfig:
@@ -142,6 +152,25 @@ def get_config() -> AppConfig:
     except ValueError as e:
         raise ValueError(f"Некорректное значение DELETE_RESOLVED_AFTER: {e}")
 
+    # Фильтры
+    host_groups_str = os.getenv('HOST_GROUPS', '')
+    host_groups = [g.strip() for g in host_groups_str.split(',') if g.strip()] if host_groups_str else None
+
+    excluded_hosts_str = os.getenv('EXCLUDED_HOSTS', '')
+    excluded_hosts = [h.strip() for h in excluded_hosts_str.split(',') if h.strip()] if excluded_hosts_str else None
+
+    # Тихие часы
+    quiet_hours_enabled = os.getenv('QUIET_HOURS_ENABLED', 'false').lower() == 'true'
+    quiet_hours_start = os.getenv('QUIET_HOURS_START', '22:00')
+    quiet_hours_end = os.getenv('QUIET_HOURS_END', '08:00')
+
+    try:
+        quiet_hours_min_severity = int(os.getenv('QUIET_HOURS_MIN_SEVERITY', '4'))
+        if not 0 <= quiet_hours_min_severity <= 5:
+            raise ValueError("QUIET_HOURS_MIN_SEVERITY должен быть в диапазоне 0-5")
+    except ValueError as e:
+        raise ValueError(f"Некорректное значение QUIET_HOURS_MIN_SEVERITY: {e}")
+
     return AppConfig(
         zabbix=zabbix_config,
         telegram=telegram_config,
@@ -152,5 +181,11 @@ def get_config() -> AppConfig:
         min_severity=min_severity,
         edit_on_update=edit_on_update,
         delete_resolved_after=delete_resolved_after,
-        mark_resolved=mark_resolved
+        mark_resolved=mark_resolved,
+        host_groups=host_groups,
+        excluded_hosts=excluded_hosts,
+        quiet_hours_enabled=quiet_hours_enabled,
+        quiet_hours_start=quiet_hours_start,
+        quiet_hours_end=quiet_hours_end,
+        quiet_hours_min_severity=quiet_hours_min_severity,
     )
