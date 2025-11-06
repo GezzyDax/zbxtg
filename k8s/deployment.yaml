@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zbxtg
+  labels:
+    app: zbxtg
+    version: v2.0.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zbxtg
+  template:
+    metadata:
+      labels:
+        app: zbxtg
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: zbxtg
+        image: zbxtg:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ZABBIX_URL
+          valueFrom:
+            secretKeyRef:
+              name: zbxtg-secrets
+              key: zabbix-url
+        - name: ZABBIX_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: zbxtg-secrets
+              key: zabbix-api-token
+              optional: true
+        - name: ZABBIX_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: zbxtg-secrets
+              key: zabbix-username
+              optional: true
+        - name: ZABBIX_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: zbxtg-secrets
+              key: zabbix-password
+              optional: true
+        - name: TELEGRAM_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: zbxtg-secrets
+              key: telegram-bot-token
+        - name: TELEGRAM_CHAT_ID
+          valueFrom:
+            secretKeyRef:
+              name: zbxtg-secrets
+              key: telegram-chat-id
+        - name: POLL_INTERVAL
+          valueFrom:
+            configMapKeyRef:
+              name: zbxtg-config
+              key: poll-interval
+              optional: true
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: zbxtg-config
+              key: log-level
+              optional: true
+        - name: MIN_SEVERITY
+          valueFrom:
+            configMapKeyRef:
+              name: zbxtg-config
+              key: min-severity
+              optional: true
+        - name: METRICS_ENABLED
+          value: "true"
+        - name: METRICS_PORT
+          value: "9090"
+        ports:
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: zbxtg-data
+      - name: logs
+        emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zbxtg-metrics
+  labels:
+    app: zbxtg
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: zbxtg
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zbxtg-data
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard

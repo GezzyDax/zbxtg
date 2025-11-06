@@ -23,9 +23,36 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - MAX_RETRIES=${MAX_RETRIES:-3}
       - RETRY_DELAY=${RETRY_DELAY:-5}
+      - MIN_SEVERITY=${MIN_SEVERITY:-2}
+
+      # UX улучшения
+      - EDIT_ON_UPDATE=${EDIT_ON_UPDATE:-true}
+      - DELETE_RESOLVED_AFTER=${DELETE_RESOLVED_AFTER:-3600}
+      - MARK_RESOLVED=${MARK_RESOLVED:-true}
+
+      # Фильтры
+      - HOST_GROUPS=${HOST_GROUPS:-}
+      - EXCLUDED_HOSTS=${EXCLUDED_HOSTS:-}
+
+      # Тихие часы
+      - QUIET_HOURS_ENABLED=${QUIET_HOURS_ENABLED:-false}
+      - QUIET_HOURS_START=${QUIET_HOURS_START:-22:00}
+      - QUIET_HOURS_END=${QUIET_HOURS_END:-08:00}
+      - QUIET_HOURS_MIN_SEVERITY=${QUIET_HOURS_MIN_SEVERITY:-4}
+
+      # Мониторинг
+      - METRICS_ENABLED=${METRICS_ENABLED:-true}
+      - METRICS_PORT=${METRICS_PORT:-9090}
+      - JSON_LOGGING=${JSON_LOGGING:-false}
+      - DATABASE_PATH=${DATABASE_PATH:-data/alerts.db}
     volumes:
       # Монтируем логи для просмотра
       - ./logs:/app/logs
+      # Монтируем данные (база данных)
+      - ./data:/app/data
+    ports:
+      # Метрики Prometheus (опционально, если нужен доступ извне)
+      - "9090:9090"
 
     # Исправление DNS: используем сеть хоста для доступа к локальным доменам
     # Вариант 1: network_mode host (используйте этот вариант)

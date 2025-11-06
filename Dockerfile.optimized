@@ -1,4 +1,6 @@
-# Multi-stage Dockerfile for production use
+# Multi-stage Dockerfile for smaller image size and better security
+
+# Builder stage
 FROM python:3.11-slim as builder
 
 # Install build dependencies
@@ -10,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python dependencies
+# Copy and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
@@ -35,14 +37,15 @@ COPY --from=builder --chown=zbxtg:zbxtg /opt/venv /opt/venv
 # Set working directory
 WORKDIR /app
 
-# Copy SSL certificates and update trust store
+# Copy application files
+COPY --chown=zbxtg:zbxtg *.py ./
+COPY --chown=zbxtg:zbxtg ssl-certs/ /app/ssl-certs/
+
+# Update CA certificates
 COPY --chown=root:root ssl-certs/ /usr/local/share/ca-certificates/
 RUN update-ca-certificates 2>/dev/null || true
 
-# Copy application files
-COPY --chown=zbxtg:zbxtg *.py ./
-
-# Set environment
+# Set PATH to use virtualenv
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -56,7 +59,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 # Switch to non-root user
 USER zbxtg
 
-# Expose metrics port (optional)
+# Expose metrics port
 EXPOSE 9090
 
 # Run application
