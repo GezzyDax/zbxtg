@@ -130,19 +130,33 @@ class ZabbixClient:
             logger.error(f"Аутентификация не удалась: {e}")
             return False
     
-    def get_problems(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Получает список активных проблем"""
+    def get_problems(self, limit: int = 100, only_active: bool = True) -> List[Dict[str, Any]]:
+        """Получает список активных проблем
+
+        Args:
+            limit: Максимальное количество проблем
+            only_active: Если True, возвращает только нерешенные проблемы
+        """
         try:
-            problems = self._make_request("problem.get", {
+            params = {
                 "output": "extend",
                 "selectTags": "extend",
                 "selectAcknowledges": "extend",
-                "recent": True,
                 "sortfield": ["eventid"],
                 "sortorder": "DESC",
-                "limit": limit
-            })
-            
+                "limit": limit,
+                "suppressed": False  # Исключаем подавленные проблемы
+            }
+
+            # Если нужны только активные - используем фильтр recent=False
+            # recent=True возвращает ВСЕ проблемы за 24 часа (включая решенные)
+            if only_active:
+                params["recent"] = False  # Только нерешенные проблемы
+            else:
+                params["recent"] = True  # Все недавние проблемы
+
+            problems = self._make_request("problem.get", params)
+
             return problems
             
         except ZabbixAPIError as e:
