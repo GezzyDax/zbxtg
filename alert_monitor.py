@@ -92,8 +92,8 @@ class AlertMonitor:
     async def _check_for_alerts(self):
         """Проверяет новые алерты"""
         try:
-            # Получаем проблемы из Zabbix
-            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 50)
+            # Получаем только активные (нерешенные) проблемы из Zabbix
+            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 50, only_active=True)
             
             if not problems:
                 logger.debug("В Zabbix не найдено проблем")
@@ -214,8 +214,8 @@ class AlertMonitor:
             if not event_ids:
                 return
 
-            # Получаем текущий статус всех отслеживаемых событий
-            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 1000)
+            # Получаем текущий статус всех отслеживаемых событий (включая решенные)
+            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 1000, only_active=False)
 
             # Создаем словарь текущих проблем по event_id
             current_problems = {p.get("eventid"): p for p in problems if p.get("eventid")}
@@ -454,13 +454,17 @@ class AlertMonitor:
     async def send_problems_list(self):
         """Отправляет список активных проблем в Telegram"""
         try:
-            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 20)
-            
+            # Получаем только активные (нерешенные) проблемы
+            all_problems = await asyncio.to_thread(self.zabbix_client.get_problems, 50, only_active=True)
+
+            # Дополнительная фильтрация на случай, если API вернул решенные проблемы
+            problems = [p for p in all_problems if p.get("r_eventid", "0") == "0"]
+
             if not problems:
                 message = "✅ <b>Активных проблем не найдено</b>"
             else:
                 message = f"🚨 <b>Активные проблемы ({len(problems)}):</b>\n\n"
-                
+
                 for i, problem in enumerate(problems[:10], 1):  # Показываем максимум 10
                     severity_icons = {
                         "0": "🔵",  # Not classified
