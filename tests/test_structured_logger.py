@@ -17,9 +17,14 @@ def test_setup_structured_logging_creates_handlers(
 
     setup_structured_logging(level="DEBUG", json_output=False, log_file=str(log_file))
 
-    logging.getLogger("structured.test").debug("structured message")
-    assert "structured message" in caplog.text
+    # Log a message after setup
+    test_logger = logging.getLogger("structured.test")
+    test_logger.debug("structured message")
+
+    # Verify file was created and contains the message
     assert log_file.exists()
+    log_content = log_file.read_text()
+    assert "structured message" in log_content
 
 
 def test_structured_logger_context(caplog: pytest.LogCaptureFixture) -> None:

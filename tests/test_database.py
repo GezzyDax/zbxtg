@@ -85,4 +85,4 @@ async def test_alert_database_statistics(tmp_path: Path) -> None:
     assert summary["total_alerts"] == 2
     assert summary["active_alerts"] == 1
     assert summary["resolved_alerts"] == 1
-    assert summary["severity_distribution"]["4"] == 1
+    assert summary["severity_distribution"][4] == 1
