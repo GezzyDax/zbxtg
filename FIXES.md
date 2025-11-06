@@ -123,6 +123,30 @@
 
 ---
 
+### 6. ❌ Конфликт зависимостей pip
+**Проблема:** CI падает с ошибкой разрешения зависимостей:
+- `safety==2.3.5` требует `packaging<22.0`
+- `black==23.12.1` требует `packaging>=22.0`
+- `pytest==7.4.3` требует `packaging` (последняя версия)
+
+```
+ERROR: Cannot install because these package versions have conflicting dependencies.
+The conflict is caused by:
+    pytest 7.4.3 depends on packaging
+    black 23.12.1 depends on packaging>=22.0
+    safety 2.3.5 depends on packaging<22.0 and >=21.0
+```
+
+**Решение:** ✅
+- Обновлен `safety` с версии 2.3.5 на 3.2.11
+- Версия 3.2.11 совместима с `packaging>=22.0`
+- Конфликт зависимостей разрешен
+
+**Файлы:**
+- `requirements-dev.txt` - обновлена версия safety
+
+---
+
 ## Commits
 
 1. **117315a** - feat: comprehensive project improvements v2.0
@@ -132,6 +156,12 @@
    - Исправление всех обнаруженных ошибок
    - Добавление недостающих параметров конфигурации
    - Обновление Docker конфигурации
+
+3. **1f4b44d** - docs: add detailed error fixes documentation
+   - Документация всех исправлений
+
+4. **de6f424** - fix: resolve pip dependency conflict with safety package
+   - Обновление safety для совместимости с packaging>=22.0
 
 ---
 
