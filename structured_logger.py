@@ -1,8 +1,9 @@
 """Structured logging configuration with JSON output support."""
 
 import logging
+import os
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pythonjsonlogger import jsonlogger
 
@@ -32,15 +33,9 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
 def setup_structured_logging(
     level: str = "INFO",
     json_output: bool = False,
-    log_file: str = None,
+    log_file: Optional[str] = None,
 ) -> None:
-    """Setup structured logging for the application.
-
-    Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        json_output: If True, output logs in JSON format
-        log_file: Optional log file path
-    """
+    """Setup structured logging for the application."""
     log_level = getattr(logging, level.upper(), logging.INFO)
 
     # Remove existing handlers
@@ -49,6 +44,7 @@ def setup_structured_logging(
         root_logger.removeHandler(handler)
 
     # Create formatter
+    formatter: logging.Formatter
     if json_output:
         formatter = CustomJsonFormatter(
             "%(timestamp)s %(level)s %(logger)s %(message)s",
@@ -69,15 +65,16 @@ def setup_structured_logging(
     # File handler (if specified)
     if log_file:
         try:
-            import os
+            log_dir = os.path.dirname(log_file)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
 
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
             file_handler = logging.FileHandler(log_file)
             file_handler.setFormatter(formatter)
             file_handler.setLevel(log_level)
             root_logger.addHandler(file_handler)
-        except Exception as e:
-            root_logger.error(f"Failed to setup file handler: {e}")
+        except OSError as exc:
+            root_logger.error("Failed to setup file handler: %s", exc)
 
     root_logger.setLevel(log_level)
 
@@ -89,46 +86,46 @@ def setup_structured_logging(
 
 
 class StructuredLogger:
-    """Wrapper for structured logging with context."""
+    """Wrapper for structured logging with context support."""
 
     def __init__(self, name: str):
         self.logger = logging.getLogger(name)
         self.context: Dict[str, Any] = {}
 
-    def set_context(self, **kwargs):
+    def set_context(self, **kwargs: Any) -> None:
         """Set context for all log messages."""
         self.context.update(kwargs)
 
-    def clear_context(self):
+    def clear_context(self) -> None:
         """Clear all context."""
         self.context = {}
 
-    def _log(self, level: int, message: str, **kwargs):
+    def _log(self, level: int, message: str, **kwargs: Any) -> None:
         """Internal log method with context."""
         extra = {"context": {**self.context, **kwargs}}
         self.logger.log(level, message, extra=extra)
 
-    def debug(self, message: str, **kwargs):
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log debug message."""
         self._log(logging.DEBUG, message, **kwargs)
 
-    def info(self, message: str, **kwargs):
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log info message."""
         self._log(logging.INFO, message, **kwargs)
 
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log warning message."""
         self._log(logging.WARNING, message, **kwargs)
 
-    def error(self, message: str, **kwargs):
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log error message."""
         self._log(logging.ERROR, message, **kwargs)
 
-    def critical(self, message: str, **kwargs):
+    def critical(self, message: str, **kwargs: Any) -> None:
         """Log critical message."""
         self._log(logging.CRITICAL, message, **kwargs)
 
-    def exception(self, message: str, **kwargs):
+    def exception(self, message: str, **kwargs: Any) -> None:
         """Log exception with traceback."""
         extra = {"context": {**self.context, **kwargs}}
         self.logger.exception(message, extra=extra)

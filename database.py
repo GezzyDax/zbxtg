@@ -1,11 +1,11 @@
 """SQLite database for persistent storage of alerts and statistics."""
 
-import aiosqlite
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+import aiosqlite
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,9 @@ class AlertDatabase:
 
     def _ensure_data_directory(self):
         """Создает директорию для базы данных если её нет."""
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        directory = os.path.dirname(self.db_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
 
     @asynccontextmanager
     async def get_connection(self):
@@ -84,15 +86,11 @@ class AlertDatabase:
             )
 
             # Индексы
-            await conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)"
-            )
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status)")
             await conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at)"
             )
-            await conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_statistics_date ON statistics(date)"
-            )
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_statistics_date ON statistics(date)")
             await conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)"
             )
@@ -184,9 +182,7 @@ class AlertDatabase:
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in rows]
 
-    async def get_alerts_by_status(
-        self, status: str, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    async def get_alerts_by_status(self, status: str, limit: int = 100) -> List[Dict[str, Any]]:
         """Получает алерты по статусу."""
         async with self.get_connection() as conn:
             async with conn.execute(
@@ -203,9 +199,7 @@ class AlertDatabase:
 
         cutoff_time = time.time() - (days * 24 * 3600)
         async with self.get_connection() as conn:
-            result = await conn.execute(
-                "DELETE FROM alerts WHERE created_at < ?", (cutoff_time,)
-            )
+            result = await conn.execute("DELETE FROM alerts WHERE created_at < ?", (cutoff_time,))
             deleted_count = result.rowcount
             logger.info(f"Deleted {deleted_count} old alerts (older than {days} days)")
             return deleted_count
@@ -222,9 +216,7 @@ class AlertDatabase:
                 (date, metric_name, metric_value, time.time()),
             )
 
-    async def get_statistics(
-        self, metric_name: str, days: int = 7
-    ) -> List[Dict[str, Any]]:
+    async def get_statistics(self, metric_name: str, days: int = 7) -> List[Dict[str, Any]]:
         """Получает статистику за период."""
         from datetime import datetime, timedelta
 

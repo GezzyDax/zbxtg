@@ -1,14 +1,8 @@
 """Tests for config module."""
 
-import os
 import pytest
 
-from config import (
-    get_config,
-    ZabbixConfig,
-    TelegramConfig,
-    AppConfig,
-)
+from config import AppConfig, TelegramConfig, ZabbixConfig, get_config
 
 
 class TestZabbixConfig:
@@ -25,9 +19,7 @@ class TestZabbixConfig:
 
     def test_zabbix_config_with_api_token(self):
         """Test ZabbixConfig with API token."""
-        config = ZabbixConfig(
-            url="https://zabbix.example.com", api_token="test_token"
-        )
+        config = ZabbixConfig(url="https://zabbix.example.com", api_token="test_token")
         assert config.api_token == "test_token"
 
     def test_zabbix_config_with_credentials(self):
@@ -46,9 +38,7 @@ class TestTelegramConfig:
 
     def test_telegram_config_creation(self):
         """Test creating TelegramConfig."""
-        config = TelegramConfig(
-            bot_token="123456:ABC-DEF", target_chat_id=123456789
-        )
+        config = TelegramConfig(bot_token="123456:ABC-DEF", target_chat_id=123456789)
         assert config.bot_token == "123456:ABC-DEF"
         assert config.target_chat_id == 123456789
         assert config.parse_mode == "HTML"

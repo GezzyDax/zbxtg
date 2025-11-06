@@ -1,7 +1,8 @@
 """Фильтры для алертов (по группам хостов, времени, и т.д.)."""
 
 import logging
-from datetime import datetime, time as dt_time
+from datetime import datetime
+from datetime import time as dt_time
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -68,9 +69,7 @@ class AlertFilters:
                 return False
         else:
             if severity < self.min_severity:
-                logger.debug(
-                    f"Alert filtered by severity: {severity} < {self.min_severity}"
-                )
+                logger.debug(f"Alert filtered by severity: {severity} < {self.min_severity}")
                 return False
 
         # Фильтр по статусу (только активные проблемы)
@@ -91,9 +90,7 @@ class AlertFilters:
                     break
 
             if not host_in_allowed_group:
-                logger.debug(
-                    f"Alert filtered: host not in allowed groups {self.host_groups}"
-                )
+                logger.debug(f"Alert filtered: host not in allowed groups {self.host_groups}")
                 return False
 
         # Фильтр исключенных хостов
@@ -133,19 +130,15 @@ def create_filters_from_config(config) -> AlertFilters:
     return AlertFilters(
         min_severity=config.min_severity,
         host_groups=config.host_groups if hasattr(config, "host_groups") else None,
-        excluded_hosts=config.excluded_hosts
-        if hasattr(config, "excluded_hosts")
-        else None,
-        quiet_hours_enabled=config.quiet_hours_enabled
-        if hasattr(config, "quiet_hours_enabled")
-        else False,
-        quiet_hours_start=config.quiet_hours_start
-        if hasattr(config, "quiet_hours_start")
-        else "22:00",
-        quiet_hours_end=config.quiet_hours_end
-        if hasattr(config, "quiet_hours_end")
-        else "08:00",
-        quiet_hours_min_severity=config.quiet_hours_min_severity
-        if hasattr(config, "quiet_hours_min_severity")
-        else 4,
+        excluded_hosts=config.excluded_hosts if hasattr(config, "excluded_hosts") else None,
+        quiet_hours_enabled=(
+            config.quiet_hours_enabled if hasattr(config, "quiet_hours_enabled") else False
+        ),
+        quiet_hours_start=(
+            config.quiet_hours_start if hasattr(config, "quiet_hours_start") else "22:00"
+        ),
+        quiet_hours_end=config.quiet_hours_end if hasattr(config, "quiet_hours_end") else "08:00",
+        quiet_hours_min_severity=(
+            config.quiet_hours_min_severity if hasattr(config, "quiet_hours_min_severity") else 4
+        ),
     )

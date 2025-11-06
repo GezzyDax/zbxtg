@@ -1,19 +1,19 @@
 import asyncio
 import logging
 import time
-from typing import Set, Dict, Any, List
-from datetime import datetime, timedelta
-from zabbix_client import ZabbixClient, ZabbixAPIError
-from telegram_bot import TelegramBot
-from config import AppConfig
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from config import AppConfig
+from telegram_bot import TelegramBot
+from zabbix_client import ZabbixAPIError, ZabbixClient
 
 logger = logging.getLogger(__name__)
 
 
 class AlertMonitor:
     """Монитор алертов Zabbix"""
-    
+
     def __init__(self, config: AppConfig, zabbix_client: ZabbixClient, telegram_bot: TelegramBot):
         self.config = config
         self.zabbix_client = zabbix_client
@@ -27,32 +27,32 @@ class AlertMonitor:
         #   "resolved_at": float (optional)
         # }
         self.sent_alerts: Dict[str, Dict[str, Any]] = {}
-        self.last_check_time = 0
+        self.last_check_time: int = 0
         self.is_running = False
 
         # Очередь неотправленных алертов (graceful degradation)
         self.failed_alerts: List[Dict[str, Any]] = []
 
         # Статистика
-        self.stats = {
+        self.stats: Dict[str, int] = {
             "total_checks": 0,
             "problems_found": 0,
             "alerts_sent": 0,
             "alerts_updated": 0,
             "alerts_deleted": 0,
             "errors": 0,
-            "last_error": None,
-            "start_time": None
         }
-    
+        self.last_error: Optional[str] = None
+        self.start_time: Optional[datetime] = None
+
     async def start_monitoring(self):
         """Запускает мониторинг алертов"""
         self.is_running = True
-        self.stats["start_time"] = datetime.now()
+        self.start_time = datetime.now()
         self.last_check_time = int(time.time()) - self.config.poll_interval
-        
+
         logger.info(f"Запуск мониторинга алертов с интервалом {self.config.poll_interval}с")
-        
+
         while self.is_running:
             try:
                 await self._check_for_alerts()
@@ -69,7 +69,7 @@ class AlertMonitor:
 
             except Exception as e:
                 self.stats["errors"] += 1
-                self.stats["last_error"] = str(e)
+                self.last_error = str(e)
                 logger.error(f"Error during alert check: {e}")
 
                 # Попытка переподключения к Zabbix
@@ -83,67 +83,72 @@ class AlertMonitor:
             # Ждем до следующей проверки
             if self.is_running:
                 await asyncio.sleep(self.config.poll_interval)
-    
+
     def stop_monitoring(self):
         """Останавливает мониторинг"""
         self.is_running = False
         logger.info("Мониторинг алертов остановлен")
-    
+
     async def _check_for_alerts(self):
         """Проверяет новые алерты"""
         try:
             # Получаем только активные (нерешенные) проблемы из Zabbix
-            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 50, only_active=True)
-            
+            problems = await asyncio.to_thread(
+                self.zabbix_client.get_problems, 50, only_active=True
+            )
+
             if not problems:
                 logger.debug("В Zabbix не найдено проблем")
                 return
-            
+
             self.stats["problems_found"] += len(problems)
             new_problems = []
-            
+
             for problem in problems:
                 problem_id = problem.get("eventid")
-                if not problem_id:
+                if not isinstance(problem_id, str) or not problem_id:
                     continue
-                
+
                 # Проверяем, не отправляли ли мы уже этот алерт
                 if problem_id in self.sent_alerts:
                     continue
-                
+
                 # Проверяем время события (отправляем только новые события)
                 event_time = int(problem.get("clock", 0))
                 if event_time <= self.last_check_time:
                     continue
-                
+
                 new_problems.append(problem)
-            
+
             if new_problems:
                 logger.info(f"Найдено {len(new_problems)} новых проблем")
-                
+
                 # Обрабатываем новые проблемы
                 for problem in new_problems:
                     await self._process_problem(problem)
-            
+
             # Обновляем время последней проверки
             self.last_check_time = int(time.time())
-            
+
             # Очищаем старые алерты из памяти (старше 24 часов)
             await self._cleanup_old_alerts()
-            
+
         except Exception as e:
             logger.error(f"Error checking for alerts: {e}")
             raise
-    
+
     async def _process_problem(self, problem: Dict[str, Any]):
         """Обрабатывает отдельную проблему"""
         try:
-            problem_id = problem.get("eventid")
+            problem_id_value = problem.get("eventid")
+            if not isinstance(problem_id_value, str):
+                logger.debug("Получена проблема без корректного eventid")
+                return
+            problem_id = problem_id_value
 
             # Получаем детальную информацию о проблеме
             problem_details = await asyncio.to_thread(
-                self.zabbix_client.get_problem_details,
-                problem
+                self.zabbix_client.get_problem_details, problem
             )
 
             # Применяем фильтры (при необходимости)
@@ -153,8 +158,7 @@ class AlertMonitor:
 
             # Отправляем алерт с inline-кнопкой
             message_id = await self.telegram_bot.send_alert(
-                problem_details,
-                zabbix_url=self.config.zabbix.url
+                problem_details, zabbix_url=self.config.zabbix.url
             )
 
             if message_id:
@@ -162,24 +166,22 @@ class AlertMonitor:
                 self.sent_alerts[problem_id] = {
                     "message_id": message_id,
                     "timestamp": time.time(),
-                    "status": "problem"
+                    "status": "problem",
                 }
                 self.stats["alerts_sent"] += 1
                 logger.info(f"Алерт {problem_id} успешно отправлен (message_id: {message_id})")
             else:
                 logger.error(f"Не удалось отправить алерт {problem_id}")
                 # Сохраняем неотправленный алерт для повторной попытки
-                self.failed_alerts.append({
-                    "problem_details": problem_details,
-                    "timestamp": time.time(),
-                    "attempts": 1
-                })
+                self.failed_alerts.append(
+                    {"problem_details": problem_details, "timestamp": time.time(), "attempts": 1}
+                )
                 logger.info(f"Алерт {problem_id} добавлен в очередь повтора")
 
         except Exception as e:
             logger.error(f"Error processing problem {problem.get('eventid', 'unknown')}: {e}")
             raise
-    
+
     def _should_send_alert(self, problem_details: Dict[str, Any]) -> bool:
         """Определяет, нужно ли отправлять алерт"""
         problem = problem_details.get("problem", {})
@@ -188,21 +190,23 @@ class AlertMonitor:
         severity = int(problem.get("severity", 0))
 
         if severity < self.config.min_severity:
-            logger.debug(f"Алерт отфильтрован: серьезность {severity} < мин {self.config.min_severity}")
+            logger.debug(
+                f"Алерт отфильтрован: серьезность {severity} < мин {self.config.min_severity}"
+            )
             return False
-        
+
         # Фильтр по статусу (только активные проблемы)
         if problem.get("r_eventid", "0") != "0":
             return False  # Проблема уже решена
-        
+
         # Можно добавить дополнительные фильтры:
         # - по тегам
-        # - по именам хостов  
+        # - по именам хостов
         # - по времени дня
         # - по группам хостов
-        
+
         return True
-    
+
     async def _check_for_status_updates(self):
         """Проверяет изменения статуса существующих алертов"""
         if not self.sent_alerts or not self.config.edit_on_update:
@@ -215,7 +219,9 @@ class AlertMonitor:
                 return
 
             # Получаем текущий статус всех отслеживаемых событий (включая решенные)
-            problems = await asyncio.to_thread(self.zabbix_client.get_problems, 1000, only_active=False)
+            problems = await asyncio.to_thread(
+                self.zabbix_client.get_problems, 1000, only_active=False
+            )
 
             # Создаем словарь текущих проблем по event_id
             current_problems = {p.get("eventid"): p for p in problems if p.get("eventid")}
@@ -234,8 +240,7 @@ class AlertMonitor:
 
                     # Получаем детальную информацию
                     problem_details = await asyncio.to_thread(
-                        self.zabbix_client.get_problem_details,
-                        problem
+                        self.zabbix_client.get_problem_details, problem
                     )
 
                     # Определяем новый статус
@@ -251,12 +256,12 @@ class AlertMonitor:
 
                     # Обновляем сообщение, если статус изменился
                     if new_status != old_status:
-                        logger.info(f"Статус алерта {event_id} изменен: {old_status} -> {new_status}")
+                        logger.info(
+                            f"Статус алерта {event_id} изменен: {old_status} -> {new_status}"
+                        )
 
                         success = await self.telegram_bot.update_alert(
-                            message_id,
-                            problem_details,
-                            zabbix_url=self.config.zabbix.url
+                            message_id, problem_details, zabbix_url=self.config.zabbix.url
                         )
 
                         if success:
@@ -297,11 +302,15 @@ class AlertMonitor:
                     if time_since_resolved >= self.config.delete_resolved_after:
                         message_id = alert_info.get("message_id")
                         if message_id:
-                            logger.info(f"Удаление решенного алерта {event_id} (решен {int(time_since_resolved)}с назад)")
+                            logger.info(
+                                f"Удаление решенного алерта {event_id} (решен {int(time_since_resolved)}с назад)"
+                            )
 
                             if self.config.mark_resolved:
                                 # Просто оставляем сообщение с пометкой RESOLVED, не удаляем
-                                logger.debug(f"Алерт {event_id} помечен как решенный, не удаляется (MARK_RESOLVED=true)")
+                                logger.debug(
+                                    f"Алерт {event_id} помечен как решенный, не удаляется (MARK_RESOLVED=true)"
+                                )
                             else:
                                 # Удаляем сообщение
                                 success = await self.telegram_bot.delete_message(message_id)
@@ -331,7 +340,8 @@ class AlertMonitor:
 
                 # Очищаем алерты старше 24 часов
                 old_alerts = [
-                    event_id for event_id, alert_info in self.sent_alerts.items()
+                    event_id
+                    for event_id, alert_info in self.sent_alerts.items()
                     if alert_info.get("timestamp", 0) < old_threshold
                 ]
 
@@ -356,22 +366,26 @@ class AlertMonitor:
             problem_details = alert_info["problem_details"]
             attempts = alert_info["attempts"]
             problem_id = problem_details.get("problem", {}).get("eventid")
+            if not isinstance(problem_id, str):
+                logger.debug("Пропуск повторной отправки: отсутствует корректный eventid")
+                continue
 
             # Максимум 5 попыток
             if attempts >= 5:
-                logger.warning(f"Алерт {problem_id} превысил максимальное количество попыток, отбрасывается")
+                logger.warning(
+                    f"Алерт {problem_id} превысил максимальное количество попыток, отбрасывается"
+                )
                 continue
 
             message_id = await self.telegram_bot.send_alert(
-                problem_details,
-                zabbix_url=self.config.zabbix.url
+                problem_details, zabbix_url=self.config.zabbix.url
             )
 
             if message_id:
                 self.sent_alerts[problem_id] = {
                     "message_id": message_id,
                     "timestamp": time.time(),
-                    "status": "problem"
+                    "status": "problem",
                 }
                 self.stats["alerts_sent"] += 1
                 logger.info(f"Алерт {problem_id} успешно отправлен при повторе #{attempts}")
@@ -385,42 +399,49 @@ class AlertMonitor:
 
     async def get_status(self) -> Dict[str, Any]:
         """Возвращает статус мониторинга"""
-        status = {
+        stats_snapshot: Dict[str, Any] = {**self.stats, "last_error": self.last_error}
+
+        status: Dict[str, Any] = {
             "running": self.is_running,
-            "stats": self.stats.copy(),
+            "stats": stats_snapshot,
             "sent_alerts_count": len(self.sent_alerts),
             "failed_alerts_count": len(self.failed_alerts),
-            "last_check_time": datetime.fromtimestamp(self.last_check_time).isoformat() if self.last_check_time else None
+            "last_check_time": (
+                datetime.fromtimestamp(self.last_check_time).isoformat()
+                if self.last_check_time
+                else None
+            ),
         }
-        
+
         # Добавляем uptime
-        if self.stats["start_time"]:
-            uptime = datetime.now() - self.stats["start_time"]
+        if self.start_time:
+            uptime = datetime.now() - self.start_time
             status["uptime_seconds"] = int(uptime.total_seconds())
-            status["uptime_str"] = str(uptime).split('.')[0]  # Убираем микросекунды
-        
+            status["uptime_str"] = str(uptime).split(".")[0]  # Убираем микросекунды
+            status["start_time"] = self.start_time.isoformat()
+
         # Проверяем подключения
         try:
             # Простая проверка через API call без auth
-            await asyncio.to_thread(self.zabbix_client._make_request, "apiinfo.version", None, True)
+            await asyncio.to_thread(self.zabbix_client._make_request, "apiinfo.version", {}, True)
             status["zabbix_connected"] = True
         except Exception as e:
             logger.debug(f"Zabbix connection check failed: {e}")
             status["zabbix_connected"] = False
-            
+
         try:
             telegram_connected = await self.telegram_bot.check_connection()
             status["telegram_connected"] = telegram_connected
         except Exception:
             status["telegram_connected"] = False
-        
+
         return status
-    
+
     async def send_status_message(self):
         """Отправляет сообщение со статусом в Telegram"""
         try:
             status = await self.get_status()
-            
+
             message = f"""
 📊 <b>Статус Zabbix монитора</b>
 
@@ -443,19 +464,22 @@ class AlertMonitor:
 🔄 <b>Очередь повтора:</b> {status["failed_alerts_count"]} в ожидании
             """.strip()
 
-            if status["stats"]["last_error"]:
-                message += f"\n\n❌ <b>Последняя ошибка:</b> {status['stats']['last_error']}"
-            
+            last_error = status["stats"].get("last_error")
+            if last_error:
+                message += f"\n\n❌ <b>Последняя ошибка:</b> {last_error}"
+
             await self.telegram_bot.send_message(message)
-            
+
         except Exception as e:
             logger.error(f"Failed to send status message: {e}")
-    
+
     async def send_problems_list(self):
         """Отправляет список активных проблем в Telegram"""
         try:
             # Получаем только активные (нерешенные) проблемы
-            all_problems = await asyncio.to_thread(self.zabbix_client.get_problems, 50, only_active=True)
+            all_problems = await asyncio.to_thread(
+                self.zabbix_client.get_problems, 50, only_active=True
+            )
 
             # Дополнительная фильтрация на случай, если API вернул решенные проблемы
             problems = [p for p in all_problems if p.get("r_eventid", "0") == "0"]
@@ -465,41 +489,43 @@ class AlertMonitor:
             else:
                 message = f"🚨 <b>Активные проблемы ({len(problems)}):</b>\n\n"
 
-                for i, problem in enumerate(problems[:10], 1):  # Показываем максимум 10
+                for index, problem in enumerate(problems[:10], 1):  # Показываем максимум 10
                     severity_icons = {
                         "0": "🔵",  # Not classified
                         "1": "🟦",  # Information
                         "2": "🟡",  # Warning
                         "3": "🟠",  # Average
                         "4": "🔴",  # High
-                        "5": "🔥"   # Disaster
+                        "5": "🔥",  # Disaster
                     }
-                    
+
                     severity = problem.get("severity", "0")
                     icon = severity_icons.get(severity, "❗")
-                    
+
                     # Получаем детали проблемы
-                    details = await asyncio.to_thread(self.zabbix_client.get_problem_details, problem)
+                    details = await asyncio.to_thread(
+                        self.zabbix_client.get_problem_details, problem
+                    )
                     hosts = details.get("hosts", [])
                     host_name = hosts[0].get("name", "Unknown") if hosts else "Unknown"
-                    
+
                     # Форматируем время
                     try:
                         timestamp = int(problem.get("clock", 0))
                         problem_time = datetime.fromtimestamp(timestamp)
                         time_str = problem_time.strftime("%d.%m %H:%M")
-                    except:
+                    except (TypeError, ValueError):
                         time_str = "Unknown"
-                    
-                    message += f"{icon} <b>{problem.get('name', 'Unknown')}</b>\n"
+
+                    message += f"{index}. {icon} <b>{problem.get('name', 'Unknown')}</b>\n"
                     message += f"   📍 Хост: {host_name}\n"
                     message += f"   ⏰ Время: {time_str}\n\n"
-                
+
                 if len(problems) > 10:
                     message += f"... и еще {len(problems) - 10} проблем"
-            
+
             await self.telegram_bot.send_message(message)
-            
+
         except Exception as e:
             logger.error(f"Failed to send problems list: {e}")
             await self.telegram_bot.send_message("❌ Ошибка при получении списка проблем")

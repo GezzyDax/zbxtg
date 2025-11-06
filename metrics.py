@@ -1,6 +1,7 @@
 """Prometheus metrics for monitoring application performance."""
 
 import logging
+
 from prometheus_client import Counter, Gauge, Histogram, Info, start_http_server
 
 logger = logging.getLogger(__name__)
@@ -124,10 +125,12 @@ class MetricsServer:
             logger.info(f"Metrics server started on port {self.port}")
 
             # Set application info
-            app_info.info({
-                "version": "2.0.0",
-                "app_name": "zbxtg",
-            })
+            app_info.info(
+                {
+                    "version": "2.0.0",
+                    "app_name": "zbxtg",
+                }
+            )
         except Exception as e:
             logger.error(f"Failed to start metrics server: {e}")
 

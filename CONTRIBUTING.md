@@ -26,7 +26,7 @@
 1. **Fork репозиторий**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/zbxtg.git
+git clone https://github.com/GezzyDax/zbxtg.git
 cd zbxtg
 ```
 

@@ -1,15 +1,13 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
-import os
-from typing import Dict, Any
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from telegram import Bot
 from telegram.ext import Application
 
-from config import ZabbixConfig, TelegramConfig, AppConfig
+from config import AppConfig, TelegramConfig, ZabbixConfig
 
 
 @pytest.fixture
@@ -158,3 +156,4 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+

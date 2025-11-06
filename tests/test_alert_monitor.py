@@ -1,11 +1,21 @@
 """Tests for alert_monitor module."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from alert_monitor import AlertMonitor
+
+
+@pytest.fixture(autouse=True)
+def immediate_to_thread(monkeypatch):
+    """Ensure background calls execute quickly during tests."""
+
+    async def _direct(func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "to_thread", _direct)
 
 
 class TestAlertMonitor:
@@ -252,7 +262,7 @@ class TestAlertMonitor:
 
         from datetime import datetime
 
-        monitor.stats["start_time"] = datetime.now()
+        monitor.start_time = datetime.now()
 
         status = await monitor.get_status()
 
@@ -275,7 +285,7 @@ class TestAlertMonitor:
 
         from datetime import datetime
 
-        monitor.stats["start_time"] = datetime.now()
+        monitor.start_time = datetime.now()
 
         await monitor.send_status_message()
 

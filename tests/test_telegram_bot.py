@@ -1,7 +1,6 @@
 """Tests for telegram_bot module."""
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from telegram.error import TelegramError
@@ -113,9 +112,7 @@ class TestTelegramBot:
         bot = TelegramBot(telegram_config)
         bot.bot = mock_telegram_bot
 
-        mock_telegram_bot.edit_message_text.side_effect = TelegramError(
-            "message is not modified"
-        )
+        mock_telegram_bot.edit_message_text.side_effect = TelegramError("message is not modified")
 
         result = await bot.edit_message(123, "Same text")
 
@@ -138,9 +135,7 @@ class TestTelegramBot:
         bot = TelegramBot(telegram_config)
         bot.bot = mock_telegram_bot
 
-        mock_telegram_bot.delete_message.side_effect = TelegramError(
-            "message to delete not found"
-        )
+        mock_telegram_bot.delete_message.side_effect = TelegramError("message to delete not found")
 
         result = await bot.delete_message(123)
 

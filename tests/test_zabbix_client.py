@@ -1,12 +1,12 @@
 """Tests for zabbix_client module."""
 
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
 
-from zabbix_client import ZabbixClient, ZabbixAPIError
+from zabbix_client import ZabbixAPIError, ZabbixClient
 
 
 class TestZabbixClient:
@@ -247,9 +247,7 @@ class TestZabbixClient:
                 "hosts": [{"hostid": "10001"}],
             }
         ]
-        mock_get_hosts.return_value = [
-            {"hostid": "10001", "name": "web-server-01"}
-        ]
+        mock_get_hosts.return_value = [{"hostid": "10001", "name": "web-server-01"}]
 
         client = ZabbixClient(zabbix_config)
         problem = {"eventid": "12345", "objectid": "54321"}
