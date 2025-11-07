@@ -161,14 +161,72 @@
 
 ## Docker публикация
 
-При создании релиза автоматически публикуются два Docker тега:
-- `latest` - всегда указывает на последний релиз
-- `vX.Y.Z` - конкретная версия
+### Типы образов
+
+#### Production образы (релизы)
+При создании тега `v*.*.*` автоматически публикуются образы в **GitHub Container Registry (GHCR)**:
+- `ghcr.io/gezzydax/zbxtg:latest` - всегда указывает на последний релиз
+- `ghcr.io/gezzydax/zbxtg:X.Y.Z` - конкретная версия (например, `1.0.0`)
+
+#### Development образы
+При push в ветку `main` или `master` автоматически публикуются:
+- `ghcr.io/gezzydax/zbxtg:dev` - последняя версия из main/master
+- `ghcr.io/gezzydax/zbxtg:main` или `ghcr.io/gezzydax/zbxtg:master` - версия из конкретной ветки
+
+### Использование образов
+
+**Production (рекомендуется):**
+```yaml
+# docker-compose.yml
+services:
+  zbxtg:
+    image: ghcr.io/gezzydax/zbxtg:1.0.0  # Конкретная версия
+```
+
+**Development:**
+```yaml
+services:
+  zbxtg:
+    image: ghcr.io/gezzydax/zbxtg:dev
+```
+
+**Latest (не рекомендуется для production):**
+```yaml
+services:
+  zbxtg:
+    image: ghcr.io/gezzydax/zbxtg:latest
+```
+
+### Доступ к образам
+
+Образы публикуются в GitHub Container Registry. Для публичного доступа:
+
+1. Откройте [Packages](https://github.com/orgs/GezzyDax/packages?repo_name=zbxtg)
+2. Выберите пакет `zbxtg`
+3. Перейдите в **Package settings**
+4. Измените видимость на **Public**
+
+Для приватных образов нужна авторизация:
+```bash
+echo "YOUR_GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+docker pull ghcr.io/gezzydax/zbxtg:latest
+```
+
+### Локальная сборка
+
+Для разработки можно собирать образ локально:
+```yaml
+# docker-compose.yml
+services:
+  zbxtg:
+    build:
+      context: .
+      dockerfile: Dockerfile
+```
 
 **Требования:**
-- Установлены GitHub Secrets:
-  - `DOCKER_USERNAME` - имя пользователя Docker Hub
-  - `DOCKER_PASSWORD` - токен доступа Docker Hub
+- Для публикации используется `GITHUB_TOKEN` (автоматически доступен в GitHub Actions)
+- Не требуются дополнительные secrets для GHCR
 
 ## Примеры сообщений коммитов
 

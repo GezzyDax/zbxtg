@@ -105,6 +105,40 @@ TELEGRAM_CHAT_ID=your_chat_id_here
 
 #### 3. Запуск в Docker
 
+**Вариант А: Использование готового образа из GitHub Container Registry (рекомендуется)**
+
+```bash
+# Образ уже настроен в docker-compose.yml
+# По умолчанию используется последний стабильный релиз
+docker-compose pull
+docker-compose up -d
+
+# Просмотр логов
+docker-compose logs -f zbxtg
+```
+
+Доступные версии образов:
+- `ghcr.io/gezzydax/zbxtg:latest` - последний стабильный релиз
+- `ghcr.io/gezzydax/zbxtg:1.0.0` - конкретная версия (для production)
+- `ghcr.io/gezzydax/zbxtg:dev` - последняя версия из main ветки (для тестирования)
+
+**Вариант Б: Локальная сборка образа**
+
+Если вы хотите собрать образ самостоятельно, отредактируйте `docker-compose.yml`:
+```yaml
+services:
+  zbxtg:
+    # Закомментируйте эту строку:
+    # image: ghcr.io/gezzydax/zbxtg:latest
+
+    # Раскомментируйте эти:
+    build:
+      context: .
+      dockerfile: Dockerfile
+```
+
+Затем:
+
 #### Linux:
 ```bash
 # Сборка и запуск
@@ -140,7 +174,7 @@ docker-run.bat logs
 
 #### Ручной запуск Docker:
 ```bash
-# Сборка
+# Сборка (только если используете локальную сборку)
 docker-compose build
 
 # Запуск
