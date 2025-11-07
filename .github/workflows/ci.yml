@@ -127,7 +127,9 @@ jobs:
         id: branch
         run: |
           BRANCH=${GITHUB_REF#refs/heads/}
-          echo "name=$BRANCH" >> $GITHUB_OUTPUT
+          # Replace / with - for valid Docker tags
+          BRANCH_TAG=${BRANCH//\//-}
+          echo "name=$BRANCH_TAG" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
