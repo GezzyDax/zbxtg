@@ -1,6 +1,6 @@
 """Tests for telegram_bot module."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from telegram.error import TelegramError
@@ -235,3 +235,256 @@ class TestTelegramBot:
             await bot.initialize()
 
             assert bot.application is not None
+
+    @pytest.mark.asyncio
+    async def test_initialize_failure(self, telegram_config):
+        """Test bot initialization failure."""
+        bot = TelegramBot(telegram_config)
+
+        with patch("telegram_bot.Application.builder") as mock_builder:
+            mock_builder.side_effect = Exception("Builder failed")
+
+            with pytest.raises(Exception, match="Builder failed"):
+                await bot.initialize()
+
+    @pytest.mark.asyncio
+    async def test_start_without_initialization(self, telegram_config):
+        """Test starting bot without prior initialization."""
+        bot = TelegramBot(telegram_config)
+
+        with patch.object(bot, 'initialize') as mock_init, \
+             patch("telegram_bot.Application") as mock_app_class:
+            mock_app = MagicMock()
+            mock_app.updater = MagicMock()
+            mock_init.return_value = None
+            bot.application = mock_app
+
+            await bot.start()
+
+            mock_init.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_start_success(self, telegram_config):
+        """Test successful bot start."""
+        bot = TelegramBot(telegram_config)
+        mock_app = MagicMock()
+        mock_app.updater = MagicMock()
+        mock_app.initialize = AsyncMock()
+        mock_app.start = AsyncMock()
+        mock_app.updater.start_polling = AsyncMock()
+        bot.application = mock_app
+
+        await bot.start()
+
+        mock_app.initialize.assert_called_once()
+        mock_app.start.assert_called_once()
+        mock_app.updater.start_polling.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_start_no_updater(self, telegram_config):
+        """Test starting bot when updater is None."""
+        bot = TelegramBot(telegram_config)
+        mock_app = MagicMock()
+        mock_app.updater = None
+        mock_app.initialize = AsyncMock()
+        mock_app.start = AsyncMock()
+        bot.application = mock_app
+
+        with pytest.raises(RuntimeError, match="Updater не настроен"):
+            await bot.start()
+
+    @pytest.mark.asyncio
+    async def test_start_failure(self, telegram_config):
+        """Test bot start failure."""
+        bot = TelegramBot(telegram_config)
+        mock_app = MagicMock()
+        mock_app.initialize = AsyncMock(side_effect=Exception("Start failed"))
+        bot.application = mock_app
+
+        with pytest.raises(Exception, match="Start failed"):
+            await bot.start()
+
+    @pytest.mark.asyncio
+    async def test_stop_success(self, telegram_config):
+        """Test successful bot stop."""
+        bot = TelegramBot(telegram_config)
+        mock_app = MagicMock()
+        mock_app.updater = MagicMock()
+        mock_app.updater.stop = AsyncMock()
+        mock_app.stop = AsyncMock()
+        mock_app.shutdown = AsyncMock()
+        bot.application = mock_app
+
+        await bot.stop()
+
+        mock_app.updater.stop.assert_called_once()
+        mock_app.stop.assert_called_once()
+        mock_app.shutdown.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_without_application(self, telegram_config):
+        """Test stop when application is None."""
+        bot = TelegramBot(telegram_config)
+
+        # Should not raise exception
+        await bot.stop()
+
+    @pytest.mark.asyncio
+    async def test_stop_with_error(self, telegram_config):
+        """Test stop when error occurs."""
+        bot = TelegramBot(telegram_config)
+        mock_app = MagicMock()
+        mock_app.updater = MagicMock()
+        mock_app.updater.stop = AsyncMock(side_effect=Exception("Stop failed"))
+        bot.application = mock_app
+
+        # Should not raise exception
+        await bot.stop()
+
+    @pytest.mark.asyncio
+    async def test_start_command(self, telegram_config):
+        """Test /start command handler."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._start_command(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "Привет" in call_args[1]["text"] or "привет" in call_args[1]["text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_help_command(self, telegram_config):
+        """Test /help command handler."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._help_command(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "/help" in call_args[1]["text"] or "/status" in call_args[1]["text"]
+
+    @pytest.mark.asyncio
+    async def test_status_command_with_monitor(self, telegram_config):
+        """Test /status command with alert monitor."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+        mock_monitor = MagicMock()
+        mock_monitor.get_status = AsyncMock(return_value="All systems operational")
+        bot.alert_monitor = mock_monitor
+
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._status_command(mock_update, mock_context)
+
+        mock_monitor.get_status.assert_called_once()
+        mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_status_command_without_monitor(self, telegram_config):
+        """Test /status command without alert monitor."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._status_command(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "не инициализирован" in call_args[1]["text"] or "недоступен" in call_args[1]["text"]
+
+    @pytest.mark.asyncio
+    async def test_problems_command_with_monitor(self, telegram_config):
+        """Test /problems command with alert monitor."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+        mock_monitor = MagicMock()
+        mock_monitor.send_status_message = AsyncMock()
+        bot.alert_monitor = mock_monitor
+
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._problems_command(mock_update, mock_context)
+
+        mock_monitor.send_status_message.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_problems_command_without_monitor(self, telegram_config):
+        """Test /problems command without alert monitor."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._problems_command(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_test_command(self, telegram_config):
+        """Test /test command handler."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._test_command(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "работает" in call_args[1]["text"].lower() or "успешно" in call_args[1]["text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_unknown_message(self, telegram_config):
+        """Test unknown message handler."""
+        from telegram import Update
+
+        bot = TelegramBot(telegram_config)
+        mock_update = MagicMock(spec=Update)
+        mock_context = MagicMock()
+        mock_update.effective_chat.id = telegram_config.target_chat_id
+        mock_update.message.reply_text = AsyncMock()
+
+        await bot._unknown_message(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args
+        assert "/help" in call_args[1]["text"]
+
+    def test_authorized_user_filter(self, telegram_config):
+        """Test authorized user filter creation."""
+        bot = TelegramBot(telegram_config)
+        user_filter = bot._authorized_user_filter()
+
+        assert user_filter is not None
