@@ -137,7 +137,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
           tags: |
             ghcr.io/${{ steps.repo.outputs.owner }}/zbxtg:dev
-            ghcr.io/${{ steps.repo.outputs.owner }}/zbxtg:${{ steps.branch.name }}
+            ghcr.io/${{ steps.repo.outputs.owner }}/zbxtg:${{ steps.branch.outputs.name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
