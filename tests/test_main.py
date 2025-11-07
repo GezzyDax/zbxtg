@@ -1,15 +1,13 @@
 """Tests for the main application module."""
 
-import asyncio
 import logging
-import signal
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from config import AppConfig, TelegramConfig, ZabbixConfig
-from main import ZabbixTelegramBot, get_version, main
+from main import ZabbixTelegramBot, main
 
 
 def make_app_config(log_level: str = "INFO") -> AppConfig:
@@ -58,12 +56,10 @@ async def test_initialize_success() -> None:
     """Test successful initialization of all components"""
     bot = ZabbixTelegramBot()
 
-    with (
-        patch("main.get_config") as mock_get_config,
-        patch("main.ZabbixClient") as mock_zabbix,
-        patch("main.TelegramBot") as mock_telegram,
-        patch("main.AlertMonitor") as mock_monitor,
-    ):
+    with patch('main.get_config') as mock_get_config, \
+         patch('main.ZabbixClient'), \
+         patch('main.TelegramBot') as mock_telegram, \
+         patch('main.AlertMonitor'):
 
         mock_get_config.return_value = make_app_config()
         mock_telegram_instance = MagicMock()
@@ -187,10 +183,8 @@ async def test_run_with_exception() -> None:
     async def mock_initialize():
         raise RuntimeError("Test error")
 
-    with (
-        patch.object(bot, "initialize", mock_initialize),
-        patch.object(bot, "shutdown", AsyncMock()),
-    ):
+    with patch.object(bot, "initialize", mock_initialize), \
+         patch.object(bot, "shutdown", AsyncMock()):
 
         with pytest.raises(RuntimeError, match="Test error"):
             await bot.run()

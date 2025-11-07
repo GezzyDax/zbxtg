@@ -1,6 +1,6 @@
 """Tests for telegram_bot module."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from telegram.error import TelegramError
