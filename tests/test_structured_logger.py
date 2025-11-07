@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any, Dict, cast
 
 import pytest
 
@@ -34,9 +35,11 @@ def test_structured_logger_context(caplog: pytest.LogCaptureFixture) -> None:
     logger.set_context(user="alice")
     logger.info("action happened", action="restart")
 
-    assert caplog.records[0].context["user"] == "alice"
-    assert caplog.records[0].context["action"] == "restart"
+    first_context = cast(Dict[str, Any], getattr(caplog.records[0], "context", {}))
+    assert first_context["user"] == "alice"
+    assert first_context["action"] == "restart"
 
     logger.clear_context()
     logger.info("clean context")
-    assert caplog.records[1].context == {}
+    second_context = cast(Dict[str, Any], getattr(caplog.records[1], "context", {}))
+    assert second_context == {}

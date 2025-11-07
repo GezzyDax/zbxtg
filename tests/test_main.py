@@ -56,26 +56,26 @@ async def test_initialize_success() -> None:
     """Test successful initialization of all components"""
     bot = ZabbixTelegramBot()
 
-    with patch('main.get_config') as mock_get_config, \
-         patch('main.ZabbixClient'), \
-         patch('main.TelegramBot') as mock_telegram, \
-         patch('main.AlertMonitor'):
+    with patch("main.get_config") as mock_get_config:
+        with patch("main.ZabbixClient"):
+            with patch("main.TelegramBot") as mock_telegram:
+                with patch("main.AlertMonitor"):
 
-        mock_get_config.return_value = make_app_config()
-        mock_telegram_instance = MagicMock()
-        mock_telegram.return_value = mock_telegram_instance
-        mock_telegram_instance.initialize = AsyncMock()
-        mock_telegram_instance.check_connection = AsyncMock(return_value=True)
-        mock_telegram_instance.send_message = AsyncMock(return_value=123)
-        mock_telegram_instance.set_alert_monitor = MagicMock()
+                    mock_get_config.return_value = make_app_config()
+                    mock_telegram_instance = MagicMock()
+                    mock_telegram.return_value = mock_telegram_instance
+                    mock_telegram_instance.initialize = AsyncMock()
+                    mock_telegram_instance.check_connection = AsyncMock(return_value=True)
+                    mock_telegram_instance.send_message = AsyncMock(return_value=123)
+                    mock_telegram_instance.set_alert_monitor = MagicMock()
 
-        await bot.initialize()
+                    await bot.initialize()
 
-        assert bot.config is not None
-        assert bot.zabbix_client is not None
-        assert bot.telegram_bot is not None
-        assert bot.alert_monitor is not None
-        mock_telegram_instance.initialize.assert_awaited_once()
+                    assert bot.config is not None
+                    assert bot.zabbix_client is not None
+                    assert bot.telegram_bot is not None
+                    assert bot.alert_monitor is not None
+                    mock_telegram_instance.initialize.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -183,11 +183,10 @@ async def test_run_with_exception() -> None:
     async def mock_initialize():
         raise RuntimeError("Test error")
 
-    with patch.object(bot, "initialize", mock_initialize), \
-         patch.object(bot, "shutdown", AsyncMock()):
-
-        with pytest.raises(RuntimeError, match="Test error"):
-            await bot.run()
+    with patch.object(bot, "initialize", mock_initialize):
+        with patch.object(bot, "shutdown", AsyncMock()):
+            with pytest.raises(RuntimeError, match="Test error"):
+                await bot.run()
 
 
 @pytest.mark.asyncio

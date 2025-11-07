@@ -131,12 +131,13 @@ class TelegramBot:
                     reply_markup=reply_markup,
                     disable_web_page_preview=True,
                 )
+                sent_message_id = sent_message.message_id
                 logger.debug(
                     "Message sent to chat %s (message_id: %s)",
                     self.config.target_chat_id,
-                    sent_message.message_id,
+                    sent_message_id,
                 )
-                return sent_message.message_id
+                return sent_message_id
 
             except TelegramError as exc:
                 if attempt < retry_count - 1:

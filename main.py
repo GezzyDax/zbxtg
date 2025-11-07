@@ -42,8 +42,8 @@ def get_version() -> str:
     try:
         if version_file.exists():
             return version_file.read_text().strip()
-    except Exception:
-        pass
+    except OSError as exc:
+        logging.getLogger(__name__).warning("Не удалось прочитать VERSION: %s", exc)
     return "unknown"
 
 
