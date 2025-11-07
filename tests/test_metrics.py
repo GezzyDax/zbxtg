@@ -37,9 +37,9 @@ def test_metrics_singleton_and_counters() -> None:
 
     monitor_checks_total.inc()
     monitor_checks_total.inc()
-    assert monitor_checks_total._value.get() == 2  # type: ignore[attr-defined]
+    assert monitor_checks_total._value.get() == 2
 
     active_alerts.set(5)
-    assert active_alerts._value.get() == 5  # type: ignore[attr-defined]
+    assert active_alerts._value.get() == 5
 
     app_info.info({"version": "test", "app_name": "zbxtg-test"})

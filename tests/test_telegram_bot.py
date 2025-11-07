@@ -235,3 +235,21 @@ class TestTelegramBot:
             await bot.initialize()
 
             assert bot.application is not None
+
+    @pytest.mark.asyncio
+    async def test_initialize_failure(self, telegram_config):
+        """Test bot initialization failure."""
+        bot = TelegramBot(telegram_config)
+
+        with patch("telegram_bot.Application.builder") as mock_builder:
+            mock_builder.side_effect = Exception("Builder failed")
+
+            with pytest.raises(Exception, match="Builder failed"):
+                await bot.initialize()
+
+    def test_authorized_user_filter(self, telegram_config):
+        """Test authorized user filter creation."""
+        bot = TelegramBot(telegram_config)
+        user_filter = bot._authorized_user_filter()
+
+        assert user_filter is not None

@@ -36,6 +36,20 @@ from telegram_bot import TelegramBot
 from zabbix_client import ZabbixClient
 
 
+def get_version() -> str:
+    """Читает версию из файла VERSION"""
+    version_file = Path(__file__).parent / "VERSION"
+    try:
+        if version_file.exists():
+            return version_file.read_text().strip()
+    except OSError as exc:
+        logging.getLogger(__name__).warning("Не удалось прочитать VERSION: %s", exc)
+    return "unknown"
+
+
+__version__ = get_version()
+
+
 class ZabbixTelegramBot:
     """Главный класс приложения"""
 
@@ -76,7 +90,9 @@ class ZabbixTelegramBot:
             self.config = get_config()
             self.setup_logging()
 
-            self.logger.info("Запуск Zabbix Telegram бота...")
+            self.logger.info("=" * 50)
+            self.logger.info("Запуск Zabbix Telegram бота v%s", __version__)
+            self.logger.info("=" * 50)
             self.logger.info("Zabbix URL: %s", self.config.zabbix.url)
             self.logger.info("ID целевого чата: %s", self.config.telegram.target_chat_id)
             self.logger.info("Интервал опроса: %sс", self.config.poll_interval)
@@ -125,8 +141,9 @@ class ZabbixTelegramBot:
             return
 
         try:
-            message = """
+            message = f"""
 🚀 <b>Zabbix монитор запущен</b>
+📦 <b>Версия: v{__version__}</b>
 
 ✅ Успешно подключено к:
 - Zabbix API
