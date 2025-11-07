@@ -1,8 +1,15 @@
 services:
   zbxtg:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Используем готовый образ из GitHub Container Registry
+    # Для production используйте конкретную версию, например: ghcr.io/gezzydax/zbxtg:1.0.0
+    # Для development используйте: ghcr.io/gezzydax/zbxtg:dev
+    image: ghcr.io/gezzydax/zbxtg:latest
+
+    # Для локальной сборки раскомментируйте следующие строки и закомментируйте image выше:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+
     container_name: zabbix-telegram-bot
     restart: unless-stopped
     environment:
