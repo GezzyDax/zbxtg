@@ -63,9 +63,12 @@ async def test_initialize_success() -> None:
          patch('main.AlertMonitor') as mock_monitor:
 
         mock_get_config.return_value = make_app_config()
-        mock_telegram_instance = AsyncMock()
+        mock_telegram_instance = MagicMock()
         mock_telegram.return_value = mock_telegram_instance
         mock_telegram_instance.initialize = AsyncMock()
+        mock_telegram_instance.check_connection = AsyncMock(return_value=True)
+        mock_telegram_instance.send_message = AsyncMock(return_value=123)
+        mock_telegram_instance.set_alert_monitor = MagicMock()
 
         await bot.initialize()
 
@@ -237,6 +240,8 @@ async def test_main_function_exception() -> None:
         mock_bot_class.return_value = mock_bot
         mock_bot.run = AsyncMock(side_effect=Exception("Test error"))
 
-        # Should re-raise
-        with pytest.raises(Exception, match="Test error"):
+        # Should call sys.exit(1)
+        with pytest.raises(SystemExit) as exc_info:
             await main()
+
+        assert exc_info.value.code == 1
