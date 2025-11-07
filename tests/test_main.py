@@ -27,6 +27,7 @@ def make_app_config(log_level: str = "INFO") -> AppConfig:
 def test_get_version_exists() -> None:
     """Test that get_version returns a version string"""
     from main import get_version
+
     version = get_version()
     assert version is not None
     assert isinstance(version, str)
@@ -57,10 +58,12 @@ async def test_initialize_success() -> None:
     """Test successful initialization of all components"""
     bot = ZabbixTelegramBot()
 
-    with patch('main.get_config') as mock_get_config, \
-         patch('main.ZabbixClient') as mock_zabbix, \
-         patch('main.TelegramBot') as mock_telegram, \
-         patch('main.AlertMonitor') as mock_monitor:
+    with (
+        patch("main.get_config") as mock_get_config,
+        patch("main.ZabbixClient") as mock_zabbix,
+        patch("main.TelegramBot") as mock_telegram,
+        patch("main.AlertMonitor") as mock_monitor,
+    ):
 
         mock_get_config.return_value = make_app_config()
         mock_telegram_instance = MagicMock()
@@ -84,7 +87,7 @@ async def test_initialize_failure() -> None:
     """Test initialization failure handling"""
     bot = ZabbixTelegramBot()
 
-    with patch('main.get_config') as mock_get_config:
+    with patch("main.get_config") as mock_get_config:
         mock_get_config.side_effect = Exception("Config error")
 
         with pytest.raises(Exception, match="Config error"):
@@ -176,8 +179,6 @@ async def test_shutdown_with_errors() -> None:
     await bot.shutdown()
 
 
-
-
 @pytest.mark.asyncio
 async def test_run_with_exception() -> None:
     """Test run handles exceptions"""
@@ -186,8 +187,10 @@ async def test_run_with_exception() -> None:
     async def mock_initialize():
         raise RuntimeError("Test error")
 
-    with patch.object(bot, 'initialize', mock_initialize), \
-         patch.object(bot, 'shutdown', AsyncMock()):
+    with (
+        patch.object(bot, "initialize", mock_initialize),
+        patch.object(bot, "shutdown", AsyncMock()),
+    ):
 
         with pytest.raises(RuntimeError, match="Test error"):
             await bot.run()
@@ -202,7 +205,7 @@ async def test_run_components_not_initialized() -> None:
         bot.config = make_app_config()
         # Don't set telegram_bot or alert_monitor
 
-    with patch.object(bot, 'initialize', mock_initialize):
+    with patch.object(bot, "initialize", mock_initialize):
         with pytest.raises(RuntimeError, match="Компоненты не инициализированы"):
             await bot.run()
 
@@ -210,7 +213,7 @@ async def test_run_components_not_initialized() -> None:
 @pytest.mark.asyncio
 async def test_main_function() -> None:
     """Test main function"""
-    with patch('main.ZabbixTelegramBot') as mock_bot_class:
+    with patch("main.ZabbixTelegramBot") as mock_bot_class:
         mock_bot = AsyncMock()
         mock_bot_class.return_value = mock_bot
         mock_bot.run = AsyncMock()
@@ -223,7 +226,7 @@ async def test_main_function() -> None:
 @pytest.mark.asyncio
 async def test_main_function_keyboard_interrupt() -> None:
     """Test main function handles KeyboardInterrupt"""
-    with patch('main.ZabbixTelegramBot') as mock_bot_class:
+    with patch("main.ZabbixTelegramBot") as mock_bot_class:
         mock_bot = AsyncMock()
         mock_bot_class.return_value = mock_bot
         mock_bot.run = AsyncMock(side_effect=KeyboardInterrupt())
@@ -235,7 +238,7 @@ async def test_main_function_keyboard_interrupt() -> None:
 @pytest.mark.asyncio
 async def test_main_function_exception() -> None:
     """Test main function handles exceptions"""
-    with patch('main.ZabbixTelegramBot') as mock_bot_class:
+    with patch("main.ZabbixTelegramBot") as mock_bot_class:
         mock_bot = AsyncMock()
         mock_bot_class.return_value = mock_bot
         mock_bot.run = AsyncMock(side_effect=Exception("Test error"))
